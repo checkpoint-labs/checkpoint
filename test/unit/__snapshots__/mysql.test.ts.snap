@@ -1,0 +1,55 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`createMySqlPool() should throw if no string or environment variable 1`] = `"a valid connection string or DATABASE_URL environment variable is required to connect to the database"`;
+
+exports[`createMySqlPool() should use argument string to create connection 1`] = `
+[MockFunction] {
+  "calls": Array [
+    Array [
+      Object {
+        "charset": "utf8mb4",
+        "connectTimeout": 30000,
+        "connectionLimit": 1,
+        "database": "string_db",
+        "host": "localhost",
+        "multipleStatements": true,
+        "password": "pass",
+        "port": 3306,
+        "user": "root",
+      },
+    ],
+  ],
+  "results": Array [
+    Object {
+      "type": "return",
+      "value": undefined,
+    },
+  ],
+}
+`;
+
+exports[`createMySqlPool() should use environment variables to create connection 1`] = `
+[MockFunction] {
+  "calls": Array [
+    Array [
+      Object {
+        "charset": "utf8mb4",
+        "connectTimeout": 30000,
+        "connectionLimit": 1,
+        "database": "env_db",
+        "host": "localhost",
+        "multipleStatements": true,
+        "password": "pass",
+        "port": 3306,
+        "user": "root",
+      },
+    ],
+  ],
+  "results": Array [
+    Object {
+      "type": "return",
+      "value": undefined,
+    },
+  ],
+}
+`;

@@ -1,0 +1,60 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[` 1`] = `"'id' field for type Vote must be non nullable."`;
+
+exports[` 2`] = `"'id' field for type Vote is not a scalar type."`;
+
+exports[` 3`] = `"'id' field for type Participant is not a scalar type."`;
+
+exports[`GqlEntityController createEntityStores should work 1`] = `
+[MockFunction] {
+  "calls": Array [
+    Array [
+      "
+
+DROP TABLE IF EXISTS votes;
+CREATE TABLE votes (
+  id INT(128) NOT NULL,
+  name VARCHAR(128),
+  PRIMARY KEY (id) ,
+  INDEX id (id),
+  INDEX name (name)
+);",
+    ],
+  ],
+  "results": Array [
+    Object {
+      "type": "return",
+      "value": undefined,
+    },
+  ],
+}
+`;
+
+exports[`GqlEntityController generateQueryFields should work 1`] = `
+"type Query {
+  vote(id: Int!): Vote
+  votes(first: Int, skip: Int, orderBy: String, orderDirection: OrderDirection, where: WhereVote): [Vote]
+}
+
+type Vote {
+  id: Int!
+  name: String
+}
+
+enum OrderDirection {
+  asc
+  desc
+}
+
+input WhereVote {
+  id_gt: Int
+  id_gte: Int
+  id_lt: Int
+  id_lte: Int
+  id: Int
+  id_in: [Int]
+  name: String
+  name_in: [String]
+}"
+`;

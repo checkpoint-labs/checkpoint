@@ -1,0 +1,41 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CheckpointsStore createStore should execute correct query 1`] = `
+Array [
+  Array [
+    "CREATE TABLE IF NOT EXISTS _checkpoints (
+      id VARCHAR(10) NOT NULL,
+      block_number BIGINT NOT NULL,
+      contract_address VARCHAR(66) NOT NULL,
+      PRIMARY KEY (id)
+    );
+CREATE TABLE IF NOT EXISTS _metadatas (
+      id VARCHAR(20) NOT NULL,
+      value VARCHAR(128) NOT NULL,
+      PRIMARY KEY (id)
+    );",
+  ],
+]
+`;
+
+exports[`CheckpointsStore insertCheckpoints should should execute correct query 1`] = `
+Array [
+  Array [
+    "INSERT IGNORE INTO _checkpoints VALUES ?",
+    Array [
+      Array [
+        Array [
+          "a739beda26",
+          5000,
+          "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
+        ],
+        Array [
+          "d2b8dcc2b5",
+          123222,
+          "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
+        ],
+      ],
+    ],
+  ],
+]
+`;
