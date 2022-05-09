@@ -6,14 +6,19 @@ import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './g
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
-import { CheckpointConfig, CheckpointOptions, SupportedNetworkName } from './types';
+import {
+  CheckpointConfig,
+  CheckpointOptions,
+  CheckpointWriters,
+  SupportedNetworkName
+} from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 import { GraphQLObjectType } from 'graphql';
 
 export default class Checkpoint {
   public config: CheckpointConfig;
-  public writer;
+  public writer: CheckpointWriters;
   public schema: string;
   public provider: Provider;
 
@@ -26,7 +31,12 @@ export default class Checkpoint {
   private checkpointsStore?: CheckpointsStore;
   private cpBlocksCache: number[] | null;
 
-  constructor(config: CheckpointConfig, writer, schema: string, opts?: CheckpointOptions) {
+  constructor(
+    config: CheckpointConfig,
+    writer: CheckpointWriters,
+    schema: string,
+    opts?: CheckpointOptions
+  ) {
     this.config = config;
     this.writer = writer;
     this.schema = schema;
