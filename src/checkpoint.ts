@@ -160,8 +160,6 @@ export default class Checkpoint {
     return nextBlock > start ? nextBlock : start;
   }
 
-  private async getNextBlockNumber(blockNumber: number) {}
-
   private async next(blockNum: number) {
     const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
     if (checkpointBlock) {
@@ -174,7 +172,11 @@ export default class Checkpoint {
     try {
       block = await this.provider.getBlock(blockNum);
     } catch (e) {
-      this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
+      if ((e as Error).message.includes('StarknetErrorCode.BLOCK_NOT_FOUND')) {
+        this.log.info({ blockNumber: blockNum }, 'block not found');
+      } else {
+        this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
+      }
 
       await Promise.delay(12e3);
       return this.next(blockNum);
