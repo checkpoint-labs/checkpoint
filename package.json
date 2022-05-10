@@ -12,7 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@graphql-tools/schema": "^8.3.5",
+    "@graphql-tools/schema": "^8.3.11",
     "bluebird": "^3.7.2",
     "connection-string": "^1.0.1",
     "dotenv": "^16.0.0",
