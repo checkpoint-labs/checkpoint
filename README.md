@@ -25,7 +25,7 @@ npm install @snapshot-labs/checkpoint
 - Core Concepts
   - [Configuration](https://docs.checkpoint.fyi/core-concepts/checkpoint-configuration)
   - [Entity schema](https://docs.checkpoint.fyi/core-concepts/entity-schema)
-  - [Data Writers](https://docs.checkpoint.fyi/core-concepts/checkpoint-writers)
+  - [Data writers](https://docs.checkpoint.fyi/core-concepts/checkpoint-writers)
 
 ## Contribution Guideline
 
