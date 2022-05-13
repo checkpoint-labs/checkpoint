@@ -21,7 +21,7 @@ npm install @snapshot-labs/checkpoint
 ## Documentation
 
 - [How it works](https://docs.checkpoint.fyi/#how-it-works)
-- [Quickstart Guide](https://docs.checkpoint.fyi/guides/quickstart)
+- [Quickstart guide](https://docs.checkpoint.fyi/guides/quickstart)
 - Core Concepts
   - [Configuration](https://docs.checkpoint.fyi/core-concepts/checkpoint-configuration)
   - [Entity schema](https://docs.checkpoint.fyi/core-concepts/entity-schema)
