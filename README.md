@@ -29,7 +29,7 @@ npm install @snapshot-labs/checkpoint
 
 ## Contribution Guideline
 
-Join snapshot's [discord](https://discord.gg/snapshot) to further discuss and engage with the team.
+Join snapshot's [Discord](https://discord.gg/snapshot) to further discuss and engage with the team.
 
 ## LICENSE
 
