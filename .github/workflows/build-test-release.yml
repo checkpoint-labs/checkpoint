@@ -1,0 +1,27 @@
+name: Build, Test and Release
+on: [push]
+jobs:
+  build-test:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - run: yarn install
+      - run: yarn build
+      - run: yarn test
+      - id: publish
+        name: Release to NPM
+        if: github.ref == 'refs/heads/master'
+        uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+      - name: Tag successful release
+        if: steps.publish.outputs.version != steps.publish.outputs.oldVersion
+        uses: rickstaa/action-create-tag@v1
+        with:
+          tag: v${{ steps.publish.outputs.version }}
+          message: 'Latest v${{ steps.publish.outputs.version }}'
