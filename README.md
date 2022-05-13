@@ -27,7 +27,7 @@ npm install @snapshot-labs/checkpoint
   - [Entity schema](https://docs.checkpoint.fyi/core-concepts/entity-schema)
   - [Data writers](https://docs.checkpoint.fyi/core-concepts/checkpoint-writers)
 
-## Contribution Guideline
+## Contribution guideline
 
 Join snapshot's [Discord](https://discord.gg/snapshot) to further discuss and engage with the team.
 
