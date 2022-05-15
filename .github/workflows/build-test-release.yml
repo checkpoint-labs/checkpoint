@@ -19,6 +19,7 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
+          tag: beta
       - name: Tag successful release
         if: steps.publish.outputs.version != steps.publish.outputs.oldVersion
         uses: rickstaa/action-create-tag@v1
