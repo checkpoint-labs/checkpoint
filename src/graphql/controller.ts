@@ -176,8 +176,6 @@ export class GqlEntityController {
     return mysql.queryAsync(sql.trimEnd());
   }
 
-  public static generateQueryFields() {}
-
   /**
    * Returns a list of objects defined within the graphql typedefs.
    * The types returns are introspection objects, that can be used

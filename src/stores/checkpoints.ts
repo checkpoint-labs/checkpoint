@@ -99,7 +99,7 @@ export class CheckpointsStore {
     return value[0][Fields.Metadata.Value];
   }
 
-  public async getMetadataNumber(id: string, base: number = 10): Promise<number | undefined> {
+  public async getMetadataNumber(id: string, base = 10): Promise<number | undefined> {
     const strValue = await this.getMetadata(id);
     if (!strValue) {
       return undefined;
@@ -138,7 +138,7 @@ export class CheckpointsStore {
   public async getNextCheckpointBlocks(
     block: number,
     contracts: string[],
-    limit: number = 15
+    limit = 15
   ): Promise<number[]> {
     const result = await this.mysql.queryAsync(
       `SELECT ${Fields.Checkpoints.BlockNumber} FROM ${Table.Checkpoints} 
