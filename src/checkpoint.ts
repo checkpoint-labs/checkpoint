@@ -220,6 +220,7 @@ export default class Checkpoint {
   private async handleBlock(block: GetBlockResponse) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     for (const receipt of block.transaction_receipts) {
       await this.handleTx(block, block.transactions[receipt.transaction_index], receipt);

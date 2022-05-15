@@ -1,12 +1,9 @@
-import { DeepMockProxy, mockDeep } from "jest-mock-extended";
-import { AsyncMySqlPool } from "../../../src";
-import {
-  CheckpointsStore,
-  getCheckpointId,
-} from "../../../src/stores/checkpoints";
-import { Logger } from "../../../src/utils/logger";
+import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
+import { AsyncMySqlPool } from '../../../src';
+import { CheckpointsStore, getCheckpointId } from '../../../src/stores/checkpoints';
+import { Logger } from '../../../src/utils/logger';
 
-describe("CheckpointsStore", () => {
+describe('CheckpointsStore', () => {
   let store: CheckpointsStore;
   let mockMysql: AsyncMySqlPool & DeepMockProxy<AsyncMySqlPool>;
   let logger: Logger & DeepMockProxy<Logger>;
@@ -14,32 +11,30 @@ describe("CheckpointsStore", () => {
   beforeEach(() => {
     mockMysql = mockDeep<AsyncMySqlPool>();
     logger = mockDeep<Logger>({
-      child: () => mockDeep(),
+      child: () => mockDeep()
     });
     store = new CheckpointsStore(mockMysql, logger);
   });
 
-  describe("createStore", () => {
-    it("should execute correct query", async () => {
+  describe('createStore', () => {
+    it('should execute correct query', async () => {
       await store.createStore();
 
       expect(mockMysql.queryAsync.mock.calls).toMatchSnapshot();
     });
   });
 
-  describe("insertCheckpoints", () => {
-    it("should should execute correct query", async () => {
+  describe('insertCheckpoints', () => {
+    it('should should execute correct query', async () => {
       const checkpoints = [
         {
-          contractAddress:
-            "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
-          blockNumber: 5000,
+          contractAddress: '0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3',
+          blockNumber: 5000
         },
         {
-          contractAddress:
-            "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
-          blockNumber: 123222,
-        },
+          contractAddress: '0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3',
+          blockNumber: 123222
+        }
       ];
       await store.insertCheckpoints(checkpoints);
 
@@ -50,10 +45,7 @@ describe("CheckpointsStore", () => {
       const firstBlockInput = queryParams[0][0];
 
       expect(firstBlockInput[0]).toEqual(
-        getCheckpointId(
-          checkpoints[0].contractAddress,
-          checkpoints[0].blockNumber
-        )
+        getCheckpointId(checkpoints[0].contractAddress, checkpoints[0].blockNumber)
       );
     });
   });

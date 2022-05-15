@@ -1,11 +1,11 @@
-import { GraphQLObjectType, GraphQLSchema, printSchema } from "graphql";
-import { mock } from "jest-mock-extended";
-import { GqlEntityController } from "../../../src/graphql/controller";
-import { AsyncMySqlPool } from "../../../src/mysql";
+import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
+import { mock } from 'jest-mock-extended';
+import { GqlEntityController } from '../../../src/graphql/controller';
+import { AsyncMySqlPool } from '../../../src/mysql';
 
-describe("GqlEntityController", () => {
-  describe("generateQueryFields", () => {
-    it("should work", () => {
+describe('GqlEntityController', () => {
+  describe('generateQueryFields', () => {
+    it('should work', () => {
       const controller = new GqlEntityController(`
 type Vote {
   id: Int!
@@ -14,8 +14,8 @@ type Vote {
   `);
       const queryFields = controller.generateQueryFields();
       const querySchema = new GraphQLObjectType({
-        name: "Query",
-        fields: queryFields,
+        name: 'Query',
+        fields: queryFields
       });
 
       const schema = printSchema(new GraphQLSchema({ query: querySchema }));
@@ -25,27 +25,25 @@ type Vote {
     // list of error table tests
     describe.each([
       {
-        reason: "non null object id",
-        schema: `type Vote { id: String }`,
+        reason: 'non null object id',
+        schema: `type Vote { id: String }`
       },
       {
-        reason: "object id is not scalar type",
-        schema: `type Vote { id: Participant! }\n\n type Participant { id: Int! }`,
+        reason: 'object id is not scalar type',
+        schema: `type Vote { id: Participant! }\n\n type Participant { id: Int! }`
       },
       {
-        reason: "object id is not scalar type 2",
-        schema: `type Participant { id: [Int]! }`,
-      },
-    ])("should fail for $reason", ({ schema }) => {
+        reason: 'object id is not scalar type 2',
+        schema: `type Participant { id: [Int]! }`
+      }
+    ])('should fail for $reason', ({ schema }) => {
       const controller = new GqlEntityController(schema);
-      expect(() =>
-        controller.generateQueryFields()
-      ).toThrowErrorMatchingSnapshot();
+      expect(() => controller.generateQueryFields()).toThrowErrorMatchingSnapshot();
     });
   });
 
-  describe("createEntityStores", () => {
-    it("should work", async () => {
+  describe('createEntityStores', () => {
+    it('should work', async () => {
       const mockMysql = mock<AsyncMySqlPool>();
       const controller = new GqlEntityController(`
 type Vote {

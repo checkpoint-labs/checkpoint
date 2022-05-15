@@ -6,21 +6,13 @@
 export default {
   clearMocks: true,
   collectCoverage: true,
-  coverageDirectory: "coverage",
-  coverageProvider: "v8",
-  coveragePathIgnorePatterns: [
-    "/node_modules/",
-    "<rootDir>/dist/",
-    "<rootDir>/test/fixtures/",
-  ],
+  coverageDirectory: 'coverage',
+  coverageProvider: 'v8',
+  coveragePathIgnorePatterns: ['/node_modules/', '<rootDir>/dist/', '<rootDir>/test/fixtures/'],
 
-  preset: "ts-jest",
-  testEnvironment: "node",
-  setupFiles: ["dotenv/config"],
-  testPathIgnorePatterns: [
-    "/node_modules/",
-    "<rootDir>/dist/",
-    "<rootDir>/test/fixtures/",
-  ],
-  moduleFileExtensions: ["js", "ts"],
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  setupFiles: ['dotenv/config'],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/dist/', '<rootDir>/test/fixtures/'],
+  moduleFileExtensions: ['js', 'ts']
 };
