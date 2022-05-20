@@ -1,4 +1,4 @@
-import { Transaction, TransactionReceipt } from 'starknet';
+import { Transaction, TransactionReceipt, GetBlockResponse } from 'starknet';
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 
@@ -63,9 +63,9 @@ export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
  * interacting with them in the databas.
  *e
  */
-type CheckpointWriter = (args: {
+export type CheckpointWriter = (args: {
   tx: Transaction;
-  block: number;
+  block: GetBlockResponse;
   receipt: TransactionReceipt;
   mysql: AsyncMySqlPool;
   source: ContractSourceConfig;
