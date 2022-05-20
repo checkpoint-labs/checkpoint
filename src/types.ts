@@ -63,7 +63,7 @@ export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
  * interacting with them in the databas.
  *e
  */
-type CheckpointWriter = (args: {
+export type CheckpointWriter = (args: {
   tx: Transaction;
   block: GetBlockResponse;
   receipt: TransactionReceipt;
