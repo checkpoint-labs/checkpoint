@@ -22,7 +22,7 @@ jobs:
           access: public
           tag: beta
       - name: Tag successful release
-        if: steps.publish.outputs.version != steps.publish.outputs.oldVersion
+        if: steps.publish.outputs.version != steps.publish.outputs.old-version
         uses: rickstaa/action-create-tag@v1
         with:
           tag: v${{ steps.publish.outputs.version }}
