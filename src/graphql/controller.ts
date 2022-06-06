@@ -17,6 +17,7 @@ import {
   GraphQLScalarType,
   GraphQLSchema,
   GraphQLString,
+  isLeafType,
   Source
 } from 'graphql';
 import { AsyncMySqlPool } from '../mysql';
@@ -220,13 +221,15 @@ export class GqlEntityController {
       fields: {}
     };
 
+    const orderByValues = {};
+
     this.getTypeFields(type).forEach(field => {
       // all field types in a where input variable must be optional
       // so we try to extract the non null type here.
       const nonNullFieldType = this.getNonNullType(field.type);
 
       // avoid setting up where filters for non scalar types
-      if (!(nonNullFieldType instanceof GraphQLScalarType)) {
+      if (!isLeafType(nonNullFieldType)) {
         return;
       }
 
@@ -243,6 +246,14 @@ export class GqlEntityController {
           type: new GraphQLList(nonNullFieldType)
         };
       }
+
+      // add fields to orderBy enum
+      orderByValues[field.name] = { value: field.name };
+    });
+
+    const OrderByEnum = new GraphQLEnumType({
+      name: `OrderBy${type.name}Fields`,
+      values: orderByValues
     });
 
     return {
@@ -255,7 +266,7 @@ export class GqlEntityController {
           type: GraphQLInt
         },
         orderBy: {
-          type: GraphQLString
+          type: OrderByEnum
         },
         orderDirection: {
           type: GraphQLOrderDirection
