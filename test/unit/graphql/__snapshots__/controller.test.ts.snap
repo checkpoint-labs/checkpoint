@@ -34,12 +34,17 @@ CREATE TABLE votes (
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!): Vote
-  votes(first: Int, skip: Int, orderBy: String, orderDirection: OrderDirection, where: WhereVote): [Vote]
+  votes(first: Int, skip: Int, orderBy: OrderByVoteFields, orderDirection: OrderDirection, where: WhereVote): [Vote]
 }
 
 type Vote {
   id: Int!
   name: String
+}
+
+enum OrderByVoteFields {
+  id
+  name
 }
 
 enum OrderDirection {
