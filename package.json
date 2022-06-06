@@ -21,6 +21,7 @@
     "express-graphql": "^0.12.0",
     "graphql": "^16.5.0",
     "graphql-fields": "^2.0.3",
+    "json-to-graphql-query": "^2.2.4",
     "mysql": "^2.18.1",
     "pino": "^7.11.0",
     "starknet": "^3.7.0"
@@ -41,5 +42,8 @@
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   },
-  "files": ["dist/**/*", "src/**/*"]
+  "files": [
+    "dist/**/*",
+    "src/**/*"
+  ]
 }

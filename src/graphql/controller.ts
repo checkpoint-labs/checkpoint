@@ -20,7 +20,11 @@ import {
   Source
 } from 'graphql';
 import { AsyncMySqlPool } from '../mysql';
-
+import {
+  generateQueryForEntity,
+  multiEntityQueryName,
+  singleEntityQueryName
+} from '../utils/graphql';
 import { querySingle, queryMulti, ResolverContext } from './resolvers';
 
 /**
@@ -49,6 +53,7 @@ const GraphQLOrderDirection = new GraphQLEnumType({
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
+  private _schemaObjects?: GraphQLObjectType[];
 
   constructor(typeDefs: string | Source) {
     this.schema = buildSchema(typeDefs);
@@ -104,11 +109,11 @@ export class GqlEntityController {
     const queryFields: GraphQLFieldConfigMap<any, any> = {};
 
     schemaObjects.forEach(type => {
-      queryFields[type.name.toLowerCase()] = this.getSingleEntityQueryConfig(
+      queryFields[singleEntityQueryName(type)] = this.getSingleEntityQueryConfig(
         type,
         resolvers.singleEntityResolver
       );
-      queryFields[`${type.name.toLowerCase()}s`] = this.getMultipleEntityQueryConfig(
+      queryFields[multiEntityQueryName(type)] = this.getMultipleEntityQueryConfig(
         type,
         resolvers.multipleEntityResolver
       );
@@ -144,13 +149,12 @@ export class GqlEntityController {
    *
    */
   public async createEntityStores(mysql: AsyncMySqlPool): Promise<void> {
-    const schemaObjects = this.schemaObjects;
-    if (schemaObjects.length === 0) {
+    if (this.schemaObjects.length === 0) {
       return;
     }
 
     let sql = '';
-    schemaObjects.forEach(type => {
+    this.schemaObjects.forEach(type => {
       sql += `\n\nDROP TABLE IF EXISTS ${type.name.toLowerCase()}s;`;
       sql += `\nCREATE TABLE ${type.name.toLowerCase()}s (`;
       let sqlIndexes = ``;
@@ -177,6 +181,25 @@ export class GqlEntityController {
   }
 
   /**
+   * Generates a query based on the first entity discovered
+   * in a schema. If no entities are found in the schema
+   * it returns undefined.
+   *
+   */
+  public generateSampleQuery(): string | undefined {
+    if (this.schemaObjects.length === 0) {
+      return undefined;
+    }
+
+    const firstEntityQuery = generateQueryForEntity(this.schemaObjects[0]);
+    const queryComment = `
+# Welcome to Checkpoint. Try running the below example query from 
+# your defined entity.
+    `;
+    return `${queryComment}\n${firstEntityQuery}`;
+  }
+
+  /**
    * Returns a list of objects defined within the graphql typedefs.
    * The types returns are introspection objects, that can be used
    * for inspecting the fields and types.
@@ -185,11 +208,17 @@ export class GqlEntityController {
    *
    */
   private get schemaObjects(): GraphQLObjectType[] {
-    return Object.values(this.schema.getTypeMap()).filter(type => {
+    if (this._schemaObjects) {
+      return this._schemaObjects;
+    }
+
+    this._schemaObjects = Object.values(this.schema.getTypeMap()).filter(type => {
       return (
         type instanceof GraphQLObjectType && type.name != 'Query' && !type.name.startsWith('__')
       );
     }) as GraphQLObjectType[];
+
+    return this._schemaObjects;
   }
 
   private getTypeFields<Parent, Context>(

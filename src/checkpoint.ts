@@ -80,10 +80,14 @@ export default class Checkpoint {
       }
     });
 
-    return getGraphQL(querySchema, {
-      log: this.log.child({ component: 'resolver' }),
-      mysql: this.mysql
-    });
+    return getGraphQL(
+      querySchema,
+      {
+        log: this.log.child({ component: 'resolver' }),
+        mysql: this.mysql
+      },
+      this.entityController.generateSampleQuery()
+    );
   }
 
   /**
