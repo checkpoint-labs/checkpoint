@@ -41,7 +41,12 @@ export default class Checkpoint {
     this.writer = writer;
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
-    this.provider = new Provider({ network: this.config.network as SupportedNetworkName });
+
+    const providerConfig = this.config.networkBaseUrl
+      ? { baseUrl: this.config.networkBaseUrl }
+      : { network: this.config.network as SupportedNetworkName };
+    this.provider = new Provider(providerConfig);
+
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
 
