@@ -1,6 +1,6 @@
 {
   "name": "@snapshot-labs/checkpoint",
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta.1",
   "license": "MIT",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -42,8 +42,5 @@
     "ts-node": "^10.8.1",
     "typescript": "^4.7.3"
   },
-  "files": [
-    "dist/**/*",
-    "src/**/*"
-  ]
+  "files": ["dist/**/*", "src/**/*"]
 }
