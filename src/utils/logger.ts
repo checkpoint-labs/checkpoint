@@ -19,8 +19,13 @@ export enum LogLevel {
 
 type Logger = Omit<PinoLogger, 'trace'>;
 
-export const createLogger = (opts?: LoggerOptions): Logger => {
-  return pino(opts);
+export const createLogger = (opts: LoggerOptions = {}): Logger => {
+  return pino(
+    opts,
+    pino.destination({
+      sync: true
+    })
+  );
 };
 
 // re-export types as it is.
