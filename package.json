@@ -24,6 +24,7 @@
     "json-to-graphql-query": "^2.2.4",
     "mysql": "^2.18.1",
     "pino": "^8.0.0",
+    "pino-pretty": "^7.6.1",
     "starknet": "^3.7.0"
   },
   "devDependencies": {
@@ -36,7 +37,6 @@
     "eslint-plugin-prettier": "^4.0.0",
     "jest": "^27.5.1",
     "jest-mock-extended": "^2.0.6",
-    "pino-pretty": "^7.6.1",
     "prettier": "^2.6.1",
     "ts-jest": "^27.1.4",
     "ts-node": "^10.8.1",

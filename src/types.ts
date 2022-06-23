@@ -7,7 +7,7 @@ export interface CheckpointOptions {
   // Note, this does not affect the log outputs in writers.
   logLevel?: LogLevel;
   // optionally format logs to pretty output.
-  // will require installing pino-pretty. Not recommended for production.
+  // Not recommended for production.
   prettifyLogs?: boolean;
   // Optional database connection string. For now only accepts mysql database
   // connection string. If no provided will default to looking up a value in
