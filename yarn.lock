@@ -484,30 +484,30 @@
     "@ethersproject/properties" "^5.6.0"
     "@ethersproject/strings" "^5.6.0"
 
-"@graphql-tools/merge@8.2.13":
-  version "8.2.13"
-  resolved "https://registry.yarnpkg.com/@graphql-tools/merge/-/merge-8.2.13.tgz#d4f254dcea301ce3d9c23b03eb68a7ae9baf6981"
-  integrity sha512-lhzjCa6wCthOYl7B6UzER3SGjU2WjSGnW0WGr8giMYsrtf6G3vIRotMcSVMlhDzyyMIOn7uPULOUt3/kaJ/rIA==
+"@graphql-tools/merge@8.2.15":
+  version "8.2.15"
+  resolved "https://registry.yarnpkg.com/@graphql-tools/merge/-/merge-8.2.15.tgz#6c41f26bca8cda6a6a7102ccc7f437cfe78ebb98"
+  integrity sha512-AXslz9ySCEKzTuK8Hl+TYEvfUWQ9tAm1oyIrut1PUEl+TQQMKATC5gCjfBw9PHFxi1ELSaa4lZdZ4bWK4sKfHQ==
   dependencies:
-    "@graphql-tools/utils" "8.6.12"
-    tslib "~2.4.0"
+    "@graphql-tools/utils" "8.7.0"
+    tslib "^2.4.0"
 
-"@graphql-tools/schema@^8.3.13":
-  version "8.3.13"
-  resolved "https://registry.yarnpkg.com/@graphql-tools/schema/-/schema-8.3.13.tgz#099460459d7821dd8deb34952900fe300085ba0b"
-  integrity sha512-e+bx1VHj1i5v4HmhCYCar0lqdoLmkRi/CfV07rTqHR6CRDbIb/S/qDCajHLt7FCovQ5ozlI5sRVbBhzfq5H0PQ==
+"@graphql-tools/schema@^8.4.0":
+  version "8.4.0"
+  resolved "https://registry.yarnpkg.com/@graphql-tools/schema/-/schema-8.4.0.tgz#a9c88bdbc2e0ac662e08b2b9abd3c431152e320c"
+  integrity sha512-1eNzmcYIdojSkLUyglJ11iqoums/U4/2XN9Aujja8val/M7yaQ7pUKScEiAwdffkH/tKqo3HLPNScXAyIvTNfg==
   dependencies:
-    "@graphql-tools/merge" "8.2.13"
-    "@graphql-tools/utils" "8.6.12"
-    tslib "~2.4.0"
+    "@graphql-tools/merge" "8.2.15"
+    "@graphql-tools/utils" "8.7.0"
+    tslib "^2.4.0"
     value-or-promise "1.0.11"
 
-"@graphql-tools/utils@8.6.12":
-  version "8.6.12"
-  resolved "https://registry.yarnpkg.com/@graphql-tools/utils/-/utils-8.6.12.tgz#0a550dc0331fd9b097fe7223d65cbbee720556e4"
-  integrity sha512-WQ91O40RC+UJgZ9K+IzevSf8oolR1QE+WQ21Oyc2fgDYYiqT0eSf+HVyhZr/8x9rVjn3N9HeqCsywbdmbljg0w==
+"@graphql-tools/utils@8.7.0":
+  version "8.7.0"
+  resolved "https://registry.yarnpkg.com/@graphql-tools/utils/-/utils-8.7.0.tgz#b46aa632ea61c1d8a43bf3012d695de73a696b3b"
+  integrity sha512-71rJZJKJVOMsDlBGFq9gf1PaBbeW0kt8nZWmc50lhxYrCn0rzRY0auGrhhOWhdhZ5WsCWFxpnDurdF5VqB4Iig==
   dependencies:
-    tslib "~2.4.0"
+    tslib "^2.4.0"
 
 "@humanwhocodes/config-array@^0.9.2":
   version "0.9.5"
@@ -3845,7 +3845,7 @@ tslib@^1.8.1, tslib@^1.9.0:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.14.1.tgz#cf2d38bdc34a134bcaf1091c41f6619e2f672d00"
   integrity sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==
 
-tslib@~2.4.0:
+tslib@^2.4.0:
   version "2.4.0"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.4.0.tgz#7cecaa7f073ce680a05847aa77be941098f36dc3"
   integrity sha512-d6xOpEDfsi2CZVlPQzGeux8XMwLT9hssAsaPYExaQMuYskwb+x1x7J371tWlbBdWHroy99KnVB6qIkUbs5X3UQ==
