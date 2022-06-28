@@ -7,6 +7,7 @@ import { Logger } from '../utils/logger';
 export interface ResolverContext {
   log: Logger;
   mysql: AsyncMySqlPool;
+  checkpointPath: string;
 }
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
@@ -37,6 +38,15 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 }
 
 export async function querySingle(parent, args, context: ResolverContext, info) {
+  const { PrismaClient } = await import(`${context.checkpointPath}/prisma/prismaClient`);
+
+  const prisma = new PrismaClient();
+  const allUsers = await prisma.user.findMany({
+    include: { posts: true }
+  });
+  // use `console.dir` to print nested objects
+  console.dir(allUsers, { depth: null });
+
   const { log, mysql } = context;
 
   const query = `SELECT * FROM ${info.fieldName}s WHERE id = ? LIMIT 1`;

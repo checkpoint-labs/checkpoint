@@ -14,6 +14,10 @@
   },
   "dependencies": {
     "@graphql-tools/schema": "^8.3.13",
+    "@prisma/client": "^3.15.2",
+    "@prisma/internals": "^3.16.0-integration-publish-prisma-internals.3",
+    "@prisma/migrate": "^3.15.2",
+    "@prisma/sdk": "^3.15.2",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
     "dotenv": "^16.0.1",
@@ -25,7 +29,8 @@
     "mysql": "^2.18.1",
     "pino": "^8.0.0",
     "pino-pretty": "^7.6.1",
-    "starknet": "^3.7.0"
+    "starknet": "^3.7.0",
+    "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

@@ -13,6 +13,9 @@ export interface CheckpointOptions {
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
   dbConnection?: string;
+  // Optional path to a directory where `.checkpoint`'s data directory will be created.
+  // It will default to the users home directory for your project.
+  buildDirectory?: string;
 }
 
 export interface ContractEventConfig {

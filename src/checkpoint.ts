@@ -1,7 +1,10 @@
+import * as path from 'path';
+import * as os from 'os';
 import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
+import { GraphQLObjectType } from 'graphql';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
@@ -13,8 +16,9 @@ import {
   SupportedNetworkName
 } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
+import * as fs from './utils/fs';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { GraphQLObjectType } from 'graphql';
+import { PrismaGenerator } from './generators/prisma';
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -25,11 +29,13 @@ export default class Checkpoint {
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
   private readonly sourceContracts: string[];
+  private readonly buildDirectory?: string;
 
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
   private checkpointsStore?: CheckpointsStore;
   private cpBlocksCache: number[] | null;
+  private prismaGenerator: PrismaGenerator;
 
   constructor(
     config: CheckpointConfig,
@@ -63,6 +69,8 @@ export default class Checkpoint {
     });
 
     this.mysqlConnection = opts?.dbConnection;
+    this.buildDirectory = opts?.buildDirectory || os.homedir();
+    this.prismaGenerator = new PrismaGenerator(this.log);
   }
 
   /**
@@ -89,7 +97,8 @@ export default class Checkpoint {
       querySchema,
       {
         log: this.log.child({ component: 'resolver' }),
-        mysql: this.mysql
+        mysql: this.mysql,
+        checkpointPath: this.checkpointPath
       },
       this.entityController.generateSampleQuery()
     );
@@ -124,6 +133,8 @@ export default class Checkpoint {
    */
   public async reset() {
     this.log.debug('reset');
+
+    await this.setupCheckpointDirIfRequired();
 
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
@@ -224,6 +235,26 @@ export default class Checkpoint {
 
     this.cpBlocksCache = checkpointBlocks;
     return this.cpBlocksCache.shift();
+  }
+
+  private async setupCheckpointDirIfRequired(): Promise<void> {
+    this.log.debug({ buildDirectory: this.buildDirectory }, 'creating .checkpoint directory');
+
+    if (!(await fs.exists(this.checkpointPath))) {
+      await fs.mkdir(this.checkpointPath);
+    }
+
+    await this.prismaGenerator.generatePrismaClient(this.checkpointPath);
+    await this.prismaGenerator.syncSchemaWithDatabase(this.checkpointPath);
+  }
+
+  private get checkpointPath(): string {
+    if (!this.buildDirectory) {
+      throw new Error(
+        'invalid buildDirectory specified or project not in an npm package.json directory'
+      );
+    }
+    return path.join(this.buildDirectory, '.checkpoint');
   }
 
   private async handleBlock(block: GetBlockResponse) {
