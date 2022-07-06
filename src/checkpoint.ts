@@ -245,16 +245,18 @@ export default class Checkpoint {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
-      if (contract === validateAndParseAddress(tx.contract_address)) {
-        if (tx.type === 'DEPLOY' && source.deploy_fn) {
-          foundContractData = true;
-          this.log.info(
-            { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
-            'found deployment transaction'
-          );
+      if (
+        tx.type === 'DEPLOY' &&
+        source.deploy_fn &&
+        contract === validateAndParseAddress(tx.contract_address)
+      ) {
+        foundContractData = true;
+        this.log.info(
+          { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
+          'found deployment transaction'
+        );
 
-          await this.writer[source.deploy_fn]({ source, block, tx, receipt, mysql: this.mysql });
-        }
+        await this.writer[source.deploy_fn]({ source, block, tx, receipt, mysql: this.mysql });
       }
 
       for (const event of receipt.events) {
