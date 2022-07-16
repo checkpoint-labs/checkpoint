@@ -231,7 +231,7 @@ export default class Checkpoint {
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    for (const receipt of block.transaction_receipts) {
+    for (const receipt of block.transaction_receipts || []) {
       await this.handleTx(block, block.transactions[receipt.transaction_index], receipt);
     }
 
