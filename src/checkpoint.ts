@@ -180,6 +180,12 @@ export default class Checkpoint {
     let block: GetBlockResponse;
     try {
       block = await this.provider.getBlock(blockNum);
+
+      if (!block.block_number || block.block_number !== blockNum) {
+        this.log.error({ blockNumber: blockNum }, 'invalid block');
+        await Promise.delay(12e3);
+        return this.next(blockNum);
+      }
     } catch (e) {
       if ((e as Error).message.includes('StarknetErrorCode.BLOCK_NOT_FOUND')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
