@@ -39,6 +39,8 @@ export interface CheckpointConfig {
   // leave this undefined and use the network_base_url
   network?: SupportedNetworkName | string;
   network_base_url?: string;
+  start?: number;
+  tx_fn?: string;
   sources: ContractSourceConfig[];
 }
 
@@ -72,7 +74,7 @@ export type CheckpointWriter = (args: {
   block: GetBlockResponse;
   receipt: TransactionReceipt;
   mysql: AsyncMySqlPool;
-  source: ContractSourceConfig;
+  source?: ContractSourceConfig;
 }) => Promise<void>;
 
 /**
