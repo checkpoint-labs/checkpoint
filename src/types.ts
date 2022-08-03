@@ -36,10 +36,12 @@ export interface ContractSourceConfig {
 export interface CheckpointConfig {
   // mainnet-alpha or goerli-alpha network. If not interested
   // in using the default starknet provider urls, then
-  // leave this undefined and use the networkBaseUrl
+  // leave this undefined and use the network_base_url
   network?: SupportedNetworkName | string;
-  networkBaseUrl?: string;
-  sources: ContractSourceConfig[];
+  network_base_url?: string;
+  start?: number;
+  tx_fn?: string;
+  sources?: ContractSourceConfig[];
 }
 
 export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
@@ -72,7 +74,7 @@ export type CheckpointWriter = (args: {
   block: GetBlockResponse;
   receipt: TransactionReceipt;
   mysql: AsyncMySqlPool;
-  source: ContractSourceConfig;
+  source?: ContractSourceConfig;
 }) => Promise<void>;
 
 /**
