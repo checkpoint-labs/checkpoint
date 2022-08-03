@@ -166,7 +166,7 @@ export default class Checkpoint {
     if (this.config.tx_fn) {
       if (this.config.start) start = this.config.start;
     } else {
-      this.config.sources.forEach(source => {
+      (this.config.sources || []).forEach(source => {
         start = start === 0 || start > source.start ? source.start : start;
       });
     }
@@ -254,7 +254,7 @@ export default class Checkpoint {
     if (this.config.tx_fn)
       await this.writer[this.config.tx_fn]({ block, tx, receipt, mysql: this.mysql });
 
-    for (const source of this.config.sources) {
+    for (const source of this.config.sources || []) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 

@@ -41,7 +41,7 @@ export interface CheckpointConfig {
   network_base_url?: string;
   start?: number;
   tx_fn?: string;
-  sources: ContractSourceConfig[];
+  sources?: ContractSourceConfig[];
 }
 
 export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
