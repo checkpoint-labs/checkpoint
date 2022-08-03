@@ -42,8 +42,8 @@ export default class Checkpoint {
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
 
-    const providerConfig = this.config.networkBaseUrl
-      ? { baseUrl: this.config.networkBaseUrl }
+    const providerConfig = this.config.network_base_url
+      ? { baseUrl: this.config.network_base_url }
       : { network: this.config.network as SupportedNetworkName };
     this.provider = new Provider(providerConfig);
 
@@ -163,16 +163,20 @@ export default class Checkpoint {
 
     const nextBlock = lastBlock + 1;
 
-    this.config.sources.forEach(source => {
-      start = start === 0 || start > source.start ? source.start : start;
-    });
+    if (this.config.tx_fn) {
+      if (this.config.start) start = this.config.start;
+    } else {
+      (this.config.sources || []).forEach(source => {
+        start = start === 0 || start > source.start ? source.start : start;
+      });
+    }
     return nextBlock > start ? nextBlock : start;
   }
 
   private async next(blockNum: number) {
-    const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
-    if (checkpointBlock) {
-      blockNum = checkpointBlock;
+    if (!this.config.tx_fn) {
+      const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+      if (checkpointBlock) blockNum = checkpointBlock;
     }
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
@@ -247,7 +251,10 @@ export default class Checkpoint {
   private async handleTx(block, tx, receipt) {
     this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction');
 
-    for (const source of this.config.sources) {
+    if (this.config.tx_fn)
+      await this.writer[this.config.tx_fn]({ block, tx, receipt, mysql: this.mysql });
+
+    for (const source of this.config.sources || []) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
