@@ -28,7 +28,7 @@ export interface ContractSourceConfig {
   // start block number
   start: number;
   // callback function in writer to handle deployment
-  deploy_fn: string;
+  deploy_fn?: string;
   events: ContractEventConfig[];
 }
 
