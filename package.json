@@ -13,7 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@graphql-tools/schema": "^8.3.13",
+    "@graphql-tools/schema": "^8.5.1",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
     "dotenv": "^16.0.1",
@@ -24,7 +24,7 @@
     "json-to-graphql-query": "^2.2.4",
     "mysql": "^2.18.1",
     "pino": "^8.0.0",
-    "pino-pretty": "^7.6.1",
+    "pino-pretty": "^8.1.0",
     "starknet": "^3.7.0"
   },
   "devDependencies": {
@@ -34,13 +34,13 @@
     "@types/node": "^18.6.3",
     "@typescript-eslint/eslint-plugin": "^5.27.1",
     "@typescript-eslint/parser": "^5.27.1",
-    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "jest": "^27.5.1",
-    "jest-mock-extended": "^2.0.6",
-    "prettier": "^2.6.1",
+    "jest-mock-extended": "^2.0.7",
+    "prettier": "^2.7.1",
     "ts-jest": "^27.1.4",
     "ts-node": "^10.8.1",
-    "typescript": "^4.7.3"
+    "typescript": "^4.7.4"
   },
   "files": ["dist/**/*", "src/**/*"]
 }
