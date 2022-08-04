@@ -73,8 +73,9 @@ export type CheckpointWriter = (args: {
   tx: Transaction;
   block: GetBlockResponse;
   receipt: TransactionReceipt;
-  mysql: AsyncMySqlPool;
+  event?: Array<any>;
   source?: ContractSourceConfig;
+  mysql: AsyncMySqlPool;
 }) => Promise<void>;
 
 /**
