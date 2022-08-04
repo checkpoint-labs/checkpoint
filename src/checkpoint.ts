@@ -282,7 +282,14 @@ export default class Checkpoint {
                 'found contract event'
               );
 
-              await this.writer[sourceEvent.fn]({ source, block, tx, receipt, mysql: this.mysql });
+              await this.writer[sourceEvent.fn]({
+                source,
+                block,
+                tx,
+                receipt,
+                event,
+                mysql: this.mysql
+              });
             }
           }
         }
