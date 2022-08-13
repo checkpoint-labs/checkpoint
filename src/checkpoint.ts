@@ -42,8 +42,8 @@ export default class Checkpoint {
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
 
-    const providerConfig = this.config.network_base_url
-      ? { baseUrl: this.config.network_base_url }
+    const providerConfig = this.config.provider_config
+      ? this.config.provider_config
       : { network: this.config.network as SupportedNetworkName };
     this.provider = new Provider(providerConfig);
 

@@ -38,7 +38,7 @@ export interface CheckpointConfig {
   // in using the default starknet provider urls, then
   // leave this undefined and use the network_base_url
   network?: SupportedNetworkName | string;
-  network_base_url?: string;
+  provider_config?: object;
   start?: number;
   tx_fn?: string;
   sources?: ContractSourceConfig[];
