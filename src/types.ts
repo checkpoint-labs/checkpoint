@@ -36,7 +36,8 @@ export interface ContractSourceConfig {
 export interface CheckpointConfig {
   // mainnet-alpha or goerli-alpha network. If not interested
   // in using the default starknet provider urls, then
-  // leave this undefined and use the network_base_url
+  // leave this undefined and use the provider_config as a
+  // classic starknet ProviderOptions object
   network?: SupportedNetworkName | string;
   provider_config?: object;
   start?: number;
