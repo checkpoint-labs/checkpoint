@@ -194,7 +194,7 @@ export class GqlEntityController {
 
     const firstEntityQuery = generateQueryForEntity(this.schemaObjects[0]);
     const queryComment = `
-# Welcome to Checkpoint. Try running the below example query from 
+# Welcome to Checkpoint. Try running the below example query from
 # your defined entity.
     `;
     return `${queryComment}\n${firstEntityQuery}`;
@@ -269,9 +269,18 @@ export class GqlEntityController {
         whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
       }
 
+      if (nonNullFieldType === GraphQLString) {
+        whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
+        whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
+      }
+
       if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
         whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
+        whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
         whereInputConfig.fields[`${field.name}_in`] = {
+          type: new GraphQLList(nonNullFieldType)
+        };
+        whereInputConfig.fields[`${field.name}_not_in`] = {
           type: new GraphQLList(nonNullFieldType)
         };
       }
