@@ -58,15 +58,21 @@ input WhereVote {
   id_lt: Int
   id_lte: Int
   id: Int
+  id_not: Int
   id_in: [Int]
+  id_not_in: [Int]
+  name_contains: String
+  name_not_contains: String
   name: String
+  name_not: String
   name_in: [String]
+  name_not_in: [String]
 }"
 `;
 
 exports[`GqlEntityController generateSampleQuery should return correct query sample for first and only entity 1`] = `
 "
-# Welcome to Checkpoint. Try running the below example query from 
+# Welcome to Checkpoint. Try running the below example query from
 # your defined entity.
     
 query {
@@ -80,7 +86,7 @@ query {
 
 exports[`GqlEntityController generateSampleQuery should return correct query sample for nested objects 1`] = `
 "
-# Welcome to Checkpoint. Try running the below example query from 
+# Welcome to Checkpoint. Try running the below example query from
 # your defined entity.
     
 query {
