@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS votes;
 CREATE TABLE votes (
   id INT(128) NOT NULL,
   name VARCHAR(128),
+  authenticators JSON,
   PRIMARY KEY (id) ,
   INDEX id (id),
   INDEX name (name)
@@ -40,6 +41,7 @@ exports[`GqlEntityController generateQueryFields should work 1`] = `
 type Vote {
   id: Int!
   name: String
+  authenticators: [String]
 }
 
 enum OrderByVoteFields {

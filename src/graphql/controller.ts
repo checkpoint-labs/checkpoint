@@ -170,7 +170,7 @@ export class GqlEntityController {
           sql += ',';
         }
 
-        if (sqlType !== 'TEXT') {
+        if (!['TEXT', 'JSON'].includes(sqlType)) {
           sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
         }
       });
@@ -370,7 +370,9 @@ export class GqlEntityController {
       return 'TEXT';
     }
 
-    // TODO(perfectmak): Add support for List types
+    if (type instanceof GraphQLList) {
+      return 'JSON';
+    }
 
     throw new Error(`sql type for ${type} not support`);
   }

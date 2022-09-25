@@ -10,6 +10,7 @@ describe('GqlEntityController', () => {
 type Vote {
   id: Int!
   name: String
+  authenticators: [String]
 }
   `);
       const queryFields = controller.generateQueryFields();
@@ -49,6 +50,7 @@ type Vote {
 type Vote {
   id: Int!
   name: String
+  authenticators: [String]
 }
   `);
       await controller.createEntityStores(mockMysql);
