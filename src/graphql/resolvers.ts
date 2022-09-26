@@ -70,7 +70,8 @@ export async function querySingle(parent, args, context: ResolverContext, info) 
   const query = `SELECT * FROM ${info.fieldName}s WHERE id = ? LIMIT 1`;
   log.debug({ sql: query, args }, 'executing single query');
 
-  const [item] = await mysql.queryAsync(query, [args.id]);
+  const id = parent?.[info.fieldName] || args.id;
+  const [item] = await mysql.queryAsync(query, [id]);
   return formatItem(item, jsonFields);
 }
 

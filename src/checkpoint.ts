@@ -2,6 +2,7 @@ import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
+import { addResolversToSchema } from '@graphql-tools/schema';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
@@ -14,7 +15,7 @@ import {
 } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { GraphQLObjectType } from 'graphql';
+import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -77,7 +78,7 @@ export default class Checkpoint {
       CheckpointsGraphQLObject
     ]);
 
-    const querySchema = new GraphQLObjectType({
+    const query = new GraphQLObjectType({
       name: 'Query',
       fields: {
         ...entityQueryFields,
@@ -85,8 +86,13 @@ export default class Checkpoint {
       }
     });
 
+    const schema = addResolversToSchema({
+      schema: new GraphQLSchema({ query }),
+      resolvers: this.entityController.generateEntityResolvers(entityQueryFields)
+    });
+
     return getGraphQL(
-      querySchema,
+      schema,
       {
         log: this.log.child({ component: 'resolver' }),
         mysql: this.mysql

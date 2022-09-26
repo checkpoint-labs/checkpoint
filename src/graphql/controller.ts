@@ -124,6 +124,30 @@ export class GqlEntityController {
   }
 
   /**
+   * Generates entity resolvers for subqueries.
+   * Returned resolvers use format compatible with addResolversToSchema.
+   * {
+   *   Proposal: {
+   *     space: () => {}
+   *   }
+   * }
+   */
+  public generateEntityResolvers(fields: GraphQLFieldConfigMap<any, any>) {
+    return this.schemaObjects.reduce((entities, obj) => {
+      entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
+        if (!(field.type instanceof GraphQLObjectType)) return resolvers;
+
+        const fieldName = singleEntityQueryName(field.type);
+
+        resolvers[fieldName] = fields[fieldName].resolve;
+        return resolvers;
+      }, {});
+
+      return entities;
+    }, {});
+  }
+
+  /**
    * Creates store for each of the objects in the schema.
    * For now, it only creates mysql tables for each of the objects.
    * It also creates a checkpoint table to track checkpoints visited.
@@ -363,6 +387,20 @@ export class GqlEntityController {
       case GraphQLString:
       case GraphQLID:
         return 'VARCHAR(128)';
+    }
+
+    if (type instanceof GraphQLObjectType) {
+      const fields = type.getFields();
+      const idField = fields['id'];
+
+      if (
+        idField &&
+        idField.type instanceof GraphQLNonNull &&
+        idField.type.ofType instanceof GraphQLScalarType &&
+        idField.type.ofType.name === 'String'
+      ) {
+        return 'VARCHAR(128)';
+      }
     }
 
     // check for TEXT scalar type
