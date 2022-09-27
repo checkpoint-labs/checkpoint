@@ -13,12 +13,7 @@ import { ResolverContext } from './resolvers';
  * Creates an graphql http handler for the query passed a parameters.
  * Returned middleware can be used with express.
  */
-export default function get(
-  query: GraphQLObjectType,
-  context: ResolverContext,
-  sampleQuery?: string
-) {
-  const schema = new GraphQLSchema({ query });
+export default function get(schema: GraphQLSchema, context: ResolverContext, sampleQuery?: string) {
   return graphqlHTTP({
     schema,
     context,

@@ -12,7 +12,8 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   const params: any = [];
   let whereSql = '';
 
-  const jsonFields = getJsonFields(info.returnType.ofType as GraphQLObjectType);
+  const returnType = info.returnType.ofType as GraphQLObjectType;
+  const jsonFields = getJsonFields(returnType);
 
   if (args.where) {
     Object.entries(args.where).map(w => {
@@ -55,7 +56,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 
   params.push(skip, first);
 
-  const query = `SELECT * FROM ${info.fieldName} ${whereSql} ${orderBySql} LIMIT ?, ?`;
+  const query = `SELECT * FROM ${returnType.name.toLowerCase()}s ${whereSql} ${orderBySql} LIMIT ?, ?`;
   log.debug({ sql: query, args }, 'executing multi query');
 
   const result = await mysql.queryAsync(query, params);
@@ -65,12 +66,14 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 export async function querySingle(parent, args, context: ResolverContext, info) {
   const { log, mysql } = context;
 
-  const jsonFields = getJsonFields(info.returnType as GraphQLObjectType);
+  const returnType = info.returnType as GraphQLObjectType;
+  const jsonFields = getJsonFields(returnType);
 
-  const query = `SELECT * FROM ${info.fieldName}s WHERE id = ? LIMIT 1`;
+  const query = `SELECT * FROM ${returnType.name.toLowerCase()}s WHERE id = ? LIMIT 1`;
   log.debug({ sql: query, args }, 'executing single query');
 
-  const [item] = await mysql.queryAsync(query, [args.id]);
+  const id = parent?.[info.fieldName] || args.id;
+  const [item] = await mysql.queryAsync(query, [id]);
   return formatItem(item, jsonFields);
 }
 
