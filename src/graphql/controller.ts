@@ -277,7 +277,21 @@ export class GqlEntityController {
     this.getTypeFields(type).forEach(field => {
       // all field types in a where input variable must be optional
       // so we try to extract the non null type here.
-      const nonNullFieldType = this.getNonNullType(field.type);
+      let nonNullFieldType = this.getNonNullType(field.type);
+
+      if (nonNullFieldType instanceof GraphQLObjectType) {
+        const fields = type.getFields();
+        const idField = fields['id'];
+
+        if (
+          idField &&
+          idField.type instanceof GraphQLNonNull &&
+          idField.type.ofType instanceof GraphQLScalarType &&
+          idField.type.ofType.name === 'String'
+        ) {
+          nonNullFieldType = this.getNonNullType(idField.type);
+        }
+      }
 
       // avoid setting up where filters for non scalar types
       if (!isLeafType(nonNullFieldType)) {
