@@ -137,9 +137,7 @@ export class GqlEntityController {
       entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
         if (!(field.type instanceof GraphQLObjectType)) return resolvers;
 
-        const fieldName = singleEntityQueryName(field.type);
-
-        resolvers[fieldName] = fields[fieldName].resolve;
+        resolvers[field.name] = fields[singleEntityQueryName(field.type)].resolve;
         return resolvers;
       }, {});
 
