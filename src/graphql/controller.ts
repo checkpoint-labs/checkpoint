@@ -24,7 +24,8 @@ import { AsyncMySqlPool } from '../mysql';
 import {
   generateQueryForEntity,
   multiEntityQueryName,
-  singleEntityQueryName
+  singleEntityQueryName,
+  getNonNullType
 } from '../utils/graphql';
 import { querySingle, queryMulti, ResolverContext } from './resolvers';
 
@@ -135,9 +136,10 @@ export class GqlEntityController {
   public generateEntityResolvers(fields: GraphQLFieldConfigMap<any, any>) {
     return this.schemaObjects.reduce((entities, obj) => {
       entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
-        if (!(field.type instanceof GraphQLObjectType)) return resolvers;
+        const nonNullType = getNonNullType(field.type);
+        if (!(nonNullType instanceof GraphQLObjectType)) return resolvers;
 
-        resolvers[field.name] = fields[singleEntityQueryName(field.type)].resolve;
+        resolvers[field.name] = fields[singleEntityQueryName(nonNullType)].resolve;
         return resolvers;
       }, {});
 
@@ -277,7 +279,7 @@ export class GqlEntityController {
     this.getTypeFields(type).forEach(field => {
       // all field types in a where input variable must be optional
       // so we try to extract the non null type here.
-      let nonNullFieldType = this.getNonNullType(field.type);
+      let nonNullFieldType = getNonNullType(field.type);
 
       if (nonNullFieldType instanceof GraphQLObjectType) {
         const fields = type.getFields();
@@ -289,7 +291,7 @@ export class GqlEntityController {
           idField.type.ofType instanceof GraphQLScalarType &&
           idField.type.ofType.name === 'String'
         ) {
-          nonNullFieldType = this.getNonNullType(idField.type);
+          nonNullFieldType = getNonNullType(idField.type);
         }
       }
 
@@ -371,14 +373,6 @@ export class GqlEntityController {
     }
 
     return nonNullType;
-  }
-
-  private getNonNullType(type: GraphQLOutputType): GraphQLOutputType {
-    if (type instanceof GraphQLNonNull) {
-      return type.ofType;
-    }
-
-    return type;
   }
 
   /**

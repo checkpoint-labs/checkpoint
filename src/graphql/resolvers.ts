@@ -1,5 +1,6 @@
 import { GraphQLField, GraphQLList, GraphQLObjectType } from 'graphql';
 import { AsyncMySqlPool } from '../mysql';
+import { getNonNullType } from '../utils/graphql';
 import { Logger } from '../utils/logger';
 
 export interface ResolverContext {
@@ -66,7 +67,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 export async function querySingle(parent, args, context: ResolverContext, info) {
   const { log, mysql } = context;
 
-  const returnType = info.returnType as GraphQLObjectType;
+  const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
   const query = `SELECT * FROM ${returnType.name.toLowerCase()}s WHERE id = ? LIMIT 1`;
