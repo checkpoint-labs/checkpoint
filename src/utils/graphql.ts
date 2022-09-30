@@ -1,4 +1,10 @@
-import { GraphQLObjectType, isLeafType, isWrappingType } from 'graphql';
+import {
+  GraphQLObjectType,
+  GraphQLOutputType,
+  GraphQLNonNull,
+  isLeafType,
+  isWrappingType
+} from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 
 /**
@@ -49,4 +55,12 @@ export const generateQueryForEntity = (entity: GraphQLObjectType): string => {
     },
     { pretty: true }
   );
+};
+
+export const getNonNullType = (type: GraphQLOutputType): GraphQLOutputType => {
+  if (type instanceof GraphQLNonNull) {
+    return type.ofType;
+  }
+
+  return type;
 };
