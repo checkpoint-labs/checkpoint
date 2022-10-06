@@ -1,27 +1,18 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
-import { AsyncMySqlPool } from '../../../src';
 import { CheckpointsStore, getCheckpointId } from '../../../src/stores/checkpoints';
 import { Logger } from '../../../src/utils/logger';
 
 describe('CheckpointsStore', () => {
   let store: CheckpointsStore;
-  let mockMysql: AsyncMySqlPool & DeepMockProxy<AsyncMySqlPool>;
+  let mockPrisma: any;
   let logger: Logger & DeepMockProxy<Logger>;
 
   beforeEach(() => {
-    mockMysql = mockDeep<AsyncMySqlPool>();
+    mockPrisma = mockDeep();
     logger = mockDeep<Logger>({
       child: () => mockDeep()
     });
-    store = new CheckpointsStore(mockMysql, logger);
-  });
-
-  describe('createStore', () => {
-    it('should execute correct query', async () => {
-      await store.createStore();
-
-      expect(mockMysql.queryAsync.mock.calls).toMatchSnapshot();
-    });
+    store = new CheckpointsStore(mockPrisma, logger);
   });
 
   describe('insertCheckpoints', () => {
@@ -38,13 +29,12 @@ describe('CheckpointsStore', () => {
       ];
       await store.insertCheckpoints(checkpoints);
 
-      expect(mockMysql.queryAsync.mock.calls).toMatchSnapshot();
+      expect(mockPrisma.checkpoint.createMany.mock.calls).toMatchSnapshot();
 
       // verify id is properly computed
-      const queryParams = mockMysql.queryAsync.mock.calls[0][1];
-      const firstBlockInput = queryParams[0][0];
+      const { id } = mockPrisma.checkpoint.createMany.mock.calls[0][0].data[0];
 
-      expect(firstBlockInput[0]).toEqual(
+      expect(id).toEqual(
         getCheckpointId(checkpoints[0].contractAddress, checkpoints[0].blockNumber)
       );
     });

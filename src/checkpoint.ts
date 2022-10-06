@@ -2,11 +2,7 @@ import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
-import { addResolversToSchema } from '@graphql-tools/schema';
-import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
-import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
-import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import {
   CheckpointConfig,
   CheckpointOptions,
@@ -15,33 +11,28 @@ import {
 } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 
 export default class Checkpoint {
   public config: CheckpointConfig;
   public writer: CheckpointWriters;
-  public schema: string;
+  public prisma: any;
   public provider: Provider;
 
-  private readonly entityController: GqlEntityController;
   private readonly log: Logger;
   private readonly sourceContracts: string[];
 
-  private mysqlPool?: AsyncMySqlPool;
-  private mysqlConnection?: string;
   private checkpointsStore?: CheckpointsStore;
   private cpBlocksCache: number[] | null;
 
   constructor(
     config: CheckpointConfig,
     writer: CheckpointWriters,
-    schema: string,
+    prisma: any,
     opts?: CheckpointOptions
   ) {
     this.config = config;
     this.writer = writer;
-    this.schema = schema;
-    this.entityController = new GqlEntityController(schema);
+    this.prisma = prisma;
 
     const providerConfig = this.config.network_base_url
       ? { baseUrl: this.config.network_base_url }
@@ -62,43 +53,6 @@ export default class Checkpoint {
           }
         : {})
     });
-
-    this.mysqlConnection = opts?.dbConnection;
-  }
-
-  /**
-   * Returns an express handler that exposes a GraphQL API to query entities defined
-   * in the schema.
-   *
-   */
-  public get graphql() {
-    const entityQueryFields = this.entityController.generateQueryFields();
-    const coreQueryFields = this.entityController.generateQueryFields([
-      MetadataGraphQLObject,
-      CheckpointsGraphQLObject
-    ]);
-
-    const query = new GraphQLObjectType({
-      name: 'Query',
-      fields: {
-        ...entityQueryFields,
-        ...coreQueryFields
-      }
-    });
-
-    const schema = addResolversToSchema({
-      schema: new GraphQLSchema({ query }),
-      resolvers: this.entityController.generateEntityResolvers(entityQueryFields)
-    });
-
-    return getGraphQL(
-      schema,
-      {
-        log: this.log.child({ component: 'resolver' }),
-        mysql: this.mysql
-      },
-      this.entityController.generateSampleQuery()
-    );
   }
 
   /**
@@ -131,10 +85,7 @@ export default class Checkpoint {
   public async reset() {
     this.log.debug('reset');
 
-    await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
-
-    await this.entityController.createEntityStores(this.mysql);
   }
 
   /**
@@ -149,8 +100,6 @@ export default class Checkpoint {
   public async seedCheckpoints(
     checkpointBlocks: { contract: string; blocks: number[] }[]
   ): Promise<void> {
-    await this.store.createStore();
-
     const checkpoints: CheckpointRecord[] = [];
 
     checkpointBlocks.forEach(cp => {
@@ -258,7 +207,12 @@ export default class Checkpoint {
     this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction');
 
     if (this.config.tx_fn)
-      await this.writer[this.config.tx_fn]({ block, tx, receipt, mysql: this.mysql });
+      await this.writer[this.config.tx_fn]({
+        block,
+        tx,
+        receipt,
+        prisma: this.prisma
+      });
 
     for (const source of this.config.sources || []) {
       let foundContractData = false;
@@ -275,7 +229,13 @@ export default class Checkpoint {
           'found deployment transaction'
         );
 
-        await this.writer[source.deploy_fn]({ source, block, tx, receipt, mysql: this.mysql });
+        await this.writer[source.deploy_fn]({
+          source,
+          block,
+          tx,
+          receipt,
+          prisma: this.prisma
+        });
       }
 
       for (const event of receipt.events) {
@@ -294,7 +254,7 @@ export default class Checkpoint {
                 tx,
                 receipt,
                 event,
-                mysql: this.mysql
+                prisma: this.prisma
               });
             }
           }
@@ -316,15 +276,6 @@ export default class Checkpoint {
       return this.checkpointsStore;
     }
 
-    return (this.checkpointsStore = new CheckpointsStore(this.mysql, this.log));
-  }
-
-  private get mysql(): AsyncMySqlPool {
-    if (this.mysqlPool) {
-      return this.mysqlPool;
-    }
-
-    // lazy initialization of mysql connection
-    return (this.mysqlPool = createMySqlPool(this.mysqlConnection));
+    return (this.checkpointsStore = new CheckpointsStore(this.prisma, this.log));
   }
 }

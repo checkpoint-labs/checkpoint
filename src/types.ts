@@ -1,5 +1,4 @@
 import { Transaction, TransactionReceipt, GetBlockResponse } from 'starknet';
-import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 
 export interface CheckpointOptions {
@@ -75,7 +74,7 @@ export type CheckpointWriter = (args: {
   receipt: TransactionReceipt;
   event?: Array<any>;
   source?: ContractSourceConfig;
-  mysql: AsyncMySqlPool;
+  prisma: any;
 }) => Promise<void>;
 
 /**
