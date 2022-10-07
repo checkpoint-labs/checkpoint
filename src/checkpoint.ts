@@ -1,7 +1,9 @@
 import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
-import { validateAndParseAddress } from 'starknet/utils/address';
+import { graphqlHTTP } from 'express-graphql';
+import { buildSchema } from 'type-graphql';
 import Promise from 'bluebird';
+import { validateAndParseAddress } from 'starknet/utils/address';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import {
   CheckpointConfig,
@@ -52,6 +54,21 @@ export default class Checkpoint {
             }
           }
         : {})
+    });
+  }
+
+  public async getGraphql({ resolvers }) {
+    const schema = await buildSchema({
+      resolvers,
+      validate: false
+    });
+
+    return graphqlHTTP({
+      schema,
+      context: {
+        prisma: this.prisma
+      },
+      graphiql: true
     });
   }
 
