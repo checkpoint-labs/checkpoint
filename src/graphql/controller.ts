@@ -289,7 +289,7 @@ export class GqlEntityController {
           idField &&
           idField.type instanceof GraphQLNonNull &&
           idField.type.ofType instanceof GraphQLScalarType &&
-          idField.type.ofType.name === 'String'
+          ['String', 'ID'].includes(idField.type.ofType.name)
         ) {
           nonNullFieldType = getNonNullType(idField.type);
         }
