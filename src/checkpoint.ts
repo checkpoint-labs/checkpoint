@@ -1,4 +1,4 @@
-import { GetBlockResponse, Provider } from 'starknet';
+import { api, RpcProvider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
@@ -7,12 +7,7 @@ import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './g
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
-import {
-  CheckpointConfig,
-  CheckpointOptions,
-  CheckpointWriters,
-  SupportedNetworkName
-} from './types';
+import { CheckpointConfig, CheckpointOptions, CheckpointWriters } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 import { GraphQLObjectType, GraphQLSchema } from 'graphql';
@@ -21,7 +16,7 @@ export default class Checkpoint {
   public config: CheckpointConfig;
   public writer: CheckpointWriters;
   public schema: string;
-  public provider: Provider;
+  public provider: RpcProvider;
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
@@ -43,10 +38,9 @@ export default class Checkpoint {
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
 
-    const providerConfig = this.config.network_base_url
-      ? { baseUrl: this.config.network_base_url }
-      : { network: this.config.network as SupportedNetworkName };
-    this.provider = new Provider(providerConfig);
+    this.provider = new RpcProvider({
+      nodeUrl: this.config.network_node_url
+    });
 
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
@@ -187,11 +181,11 @@ export default class Checkpoint {
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
-    let block: GetBlockResponse;
+    let block: api.RPC.GetBlockWithTxs;
     try {
-      block = await this.provider.getBlock(blockNum);
+      block = await this.provider.getBlockWithTxs(blockNum);
 
-      if (!block.block_number || block.block_number !== blockNum) {
+      if (!('block_number' in block) || block.block_number !== blockNum) {
         this.log.error({ blockNumber: blockNum }, 'invalid block');
         await Promise.delay(12e3);
         return this.next(blockNum);
@@ -242,13 +236,21 @@ export default class Checkpoint {
     return this.cpBlocksCache.shift();
   }
 
-  private async handleBlock(block: GetBlockResponse) {
+  private async handleBlock(block: api.RPC.GetBlockWithTxs) {
+    if (!('block_number' in block)) return;
+
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    for (const receipt of block.transaction_receipts || []) {
-      await this.handleTx(block, block.transactions[receipt.transaction_index], receipt);
+    const receipts = await Promise.all(
+      block.transactions.map(tx => {
+        if (!tx.transaction_hash) return null;
+
+        return this.provider.getTransactionReceipt(tx.transaction_hash);
+      })
+    );
+
+    for (const [i, tx] of block.transactions.entries()) {
+      await this.handleTx(block, tx, receipts[i]);
     }
 
     this.log.debug({ blockNumber: block.block_number }, 'handling block done');
@@ -278,7 +280,7 @@ export default class Checkpoint {
         await this.writer[source.deploy_fn]({ source, block, tx, receipt, mysql: this.mysql });
       }
 
-      for (const event of receipt.events) {
+      for (const event of receipt.events || []) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (`0x${starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {

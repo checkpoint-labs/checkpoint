@@ -1,6 +1,6 @@
-import { Transaction, TransactionReceipt, GetBlockResponse } from 'starknet';
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
+import type { api } from 'starknet';
 
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
@@ -34,17 +34,11 @@ export interface ContractSourceConfig {
 
 // Configuration used to initialize Checkpoint
 export interface CheckpointConfig {
-  // mainnet-alpha or goerli-alpha network. If not interested
-  // in using the default starknet provider urls, then
-  // leave this undefined and use the network_base_url
-  network?: SupportedNetworkName | string;
-  network_base_url?: string;
+  network_node_url: string;
   start?: number;
   tx_fn?: string;
   sources?: ContractSourceConfig[];
 }
-
-export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
 
 /**
  * Callback function invoked by checkpoint when a contract event
@@ -70,9 +64,9 @@ export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
  *e
  */
 export type CheckpointWriter = (args: {
-  tx: Transaction;
-  block: GetBlockResponse;
-  receipt: TransactionReceipt;
+  tx: api.RPC.Transaction;
+  block: api.RPC.GetBlockWithTxs;
+  receipt: api.RPC.TransactionReceipt;
   event?: Array<any>;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
