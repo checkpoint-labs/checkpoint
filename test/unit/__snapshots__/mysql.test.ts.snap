@@ -7,6 +7,7 @@ exports[`createMySqlPool() should use argument string to create connection 1`] =
   "calls": Array [
     Array [
       Object {
+        "bigNumberStrings": true,
         "charset": "utf8mb4",
         "connectTimeout": 30000,
         "connectionLimit": 1,
@@ -15,6 +16,7 @@ exports[`createMySqlPool() should use argument string to create connection 1`] =
         "multipleStatements": true,
         "password": "pass",
         "port": 3306,
+        "supportBigNumbers": true,
         "user": "root",
       },
     ],
@@ -33,6 +35,7 @@ exports[`createMySqlPool() should use environment variables to create connection
   "calls": Array [
     Array [
       Object {
+        "bigNumberStrings": true,
         "charset": "utf8mb4",
         "connectTimeout": 30000,
         "connectionLimit": 1,
@@ -41,6 +44,7 @@ exports[`createMySqlPool() should use environment variables to create connection
         "multipleStatements": true,
         "password": "pass",
         "port": 3306,
+        "supportBigNumbers": true,
         "user": "root",
       },
     ],

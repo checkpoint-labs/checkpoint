@@ -44,7 +44,9 @@ export const createMySqlPool = (connection?: string): AsyncMySqlPool => {
     host: connectionConfig.hosts[0].name,
     port: connectionConfig.hosts[0].port,
     connectTimeout: 30000, // 30 seconds
-    charset: 'utf8mb4'
+    charset: 'utf8mb4',
+    supportBigNumbers: true,
+    bigNumberStrings: true
   };
 
   return mysql.createPool(config) as AsyncMySqlPool;
