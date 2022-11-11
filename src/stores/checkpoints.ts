@@ -151,6 +151,6 @@ export class CheckpointsStore {
 
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
 
-    return result.map(value => value[Fields.Checkpoints.BlockNumber]);
+    return result.map(value => Number(value[Fields.Checkpoints.BlockNumber]));
   }
 }

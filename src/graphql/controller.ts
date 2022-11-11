@@ -27,6 +27,7 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
+import { CheckpointOptions } from '../types';
 import { querySingle, queryMulti, ResolverContext } from './resolvers';
 
 /**
@@ -55,10 +56,21 @@ const GraphQLOrderDirection = new GraphQLEnumType({
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
+  private readonly decimalTypes: NonNullable<CheckpointOptions['decimalTypes']>;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source) {
+  constructor(typeDefs: string | Source, opts?: CheckpointOptions) {
     this.schema = buildSchema(typeDefs);
+    this.decimalTypes = opts?.decimalTypes || {
+      Decimal: {
+        p: 10,
+        d: 2
+      },
+      BigDecimal: {
+        p: 20,
+        d: 8
+      }
+    };
   }
 
   /**
@@ -307,6 +319,16 @@ export class GqlEntityController {
         whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
       }
 
+      if (
+        (nonNullFieldType instanceof GraphQLScalarType && nonNullFieldType.name === 'BigInt') ||
+        this.decimalTypes[nonNullFieldType.name]
+      ) {
+        whereInputConfig.fields[`${field.name}_gt`] = { type: nonNullFieldType };
+        whereInputConfig.fields[`${field.name}_gte`] = { type: nonNullFieldType };
+        whereInputConfig.fields[`${field.name}_lt`] = { type: nonNullFieldType };
+        whereInputConfig.fields[`${field.name}_lte`] = { type: nonNullFieldType };
+      }
+
       if (nonNullFieldType === GraphQLString) {
         whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
         whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
@@ -412,6 +434,15 @@ export class GqlEntityController {
     // check for TEXT scalar type
     if (type instanceof GraphQLScalarType && type.name === 'Text') {
       return 'TEXT';
+    }
+
+    if (type instanceof GraphQLScalarType && type.name === 'BigInt') {
+      return 'BIGINT';
+    }
+
+    if (type instanceof GraphQLScalarType && this.decimalTypes[type.name]) {
+      const decimalType = this.decimalTypes[type.name];
+      return `DECIMAL(${decimalType.p}, ${decimalType.d})`;
     }
 
     if (type instanceof GraphQLList) {
