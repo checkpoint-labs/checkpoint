@@ -7,20 +7,55 @@ import {
   GraphQLSchema,
   GraphQLString
 } from 'graphql';
-import { ResolverContext } from './resolvers';
+import DataLoader from 'dataloader';
+import { ResolverContextInput } from './resolvers';
+
+/**
+ * Creates getLoader function that will return existing, or create a new dataloader
+ * for specific entity.
+ * createGetLoader should be called per-request so each request has its own caching
+ * and batching.
+ */
+const createGetLoader = (context: ResolverContextInput) => {
+  const loaders = {};
+
+  return (name: string) => {
+    if (!loaders[name]) {
+      loaders[name] = new DataLoader(async ids => {
+        const query = `SELECT * FROM ${name}s WHERE id in (?)`;
+
+        context.log.debug({ sql: query, ids }, 'executing batched query');
+
+        const results = await context.mysql.queryAsync(query, [ids]);
+        const resultsMap = Object.fromEntries(results.map(result => [result.id, result]));
+
+        return ids.map((id: any) => resultsMap[id] || new Error(`Row not found: ${id}`));
+      });
+    }
+
+    return loaders[name];
+  };
+};
 
 /**
  * Creates an graphql http handler for the query passed a parameters.
  * Returned middleware can be used with express.
  */
-export default function get(schema: GraphQLSchema, context: ResolverContext, sampleQuery?: string) {
-  return graphqlHTTP({
+export default function get(
+  schema: GraphQLSchema,
+  context: ResolverContextInput,
+  sampleQuery?: string
+) {
+  return graphqlHTTP(() => ({
     schema,
-    context,
+    context: {
+      ...context,
+      getLoader: createGetLoader(context)
+    },
     graphiql: {
       defaultQuery: sampleQuery
     }
-  });
+  }));
 }
 
 /**
