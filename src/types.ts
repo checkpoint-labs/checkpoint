@@ -1,6 +1,7 @@
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 import type { api } from 'starknet';
+import type Checkpoint from './checkpoint';
 
 // Shortcuts to starknet types.
 export type Block = api.RPC.GetBlockWithTxs;
@@ -83,6 +84,7 @@ export type CheckpointWriter = (args: {
   event?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
+  instance: Checkpoint;
 }) => Promise<void>;
 
 /**
