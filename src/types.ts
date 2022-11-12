@@ -2,6 +2,17 @@ import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 import type { api } from 'starknet';
 
+// Shortcuts to starknet types.
+export type Block = api.RPC.GetBlockWithTxs;
+export type Transaction = api.RPC.Transaction;
+export type Event = api.RPC.GetEventsResponse['events'][number];
+
+// (Partially) narrowed types as real types are not exported from `starknet`.
+export type FullBlock = Block & { block_number: number };
+export type DeployTransaction = Transaction & { contract_address: string };
+
+export type EventsMap = { [key: string]: Event[] };
+
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
   // Note, this does not affect the log outputs in writers.
@@ -64,10 +75,9 @@ export interface CheckpointConfig {
  *e
  */
 export type CheckpointWriter = (args: {
-  tx: api.RPC.Transaction;
-  block: api.RPC.GetBlockWithTxs;
-  receipt: api.RPC.TransactionReceipt;
-  event?: Array<any>;
+  tx: Transaction;
+  block: Block;
+  event?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
 }) => Promise<void>;
@@ -81,4 +91,12 @@ export type CheckpointWriter = (args: {
  */
 export interface CheckpointWriters {
   [event: string]: CheckpointWriter;
+}
+
+export function isFullBlock(block: Block): block is FullBlock {
+  return 'block_number' in block;
+}
+
+export function isDeployTransaction(tx: Transaction): tx is DeployTransaction {
+  return tx.type === 'DEPLOY';
 }

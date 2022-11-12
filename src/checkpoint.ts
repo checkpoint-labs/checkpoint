@@ -1,4 +1,4 @@
-import { api, RpcProvider } from 'starknet';
+import { RpcProvider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
@@ -7,7 +7,18 @@ import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './g
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
-import { CheckpointConfig, CheckpointOptions, CheckpointWriters } from './types';
+import {
+  Block,
+  FullBlock,
+  Transaction,
+  Event,
+  EventsMap,
+  CheckpointConfig,
+  CheckpointOptions,
+  CheckpointWriters,
+  isFullBlock,
+  isDeployTransaction
+} from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 import { GraphQLObjectType, GraphQLSchema } from 'graphql';
@@ -181,11 +192,15 @@ export default class Checkpoint {
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
-    let block: api.RPC.GetBlockWithTxs;
+    let block: Block;
+    let blockEvents: EventsMap;
     try {
-      block = await this.provider.getBlockWithTxs(blockNum);
+      [block, blockEvents] = await Promise.all([
+        this.provider.getBlockWithTxs(blockNum),
+        this.getEvents(blockNum)
+      ]);
 
-      if (!('block_number' in block) || block.block_number !== blockNum) {
+      if (!isFullBlock(block) || block.block_number !== blockNum) {
         this.log.error({ blockNumber: blockNum }, 'invalid block');
         await Promise.delay(12e3);
         return this.next(blockNum);
@@ -201,7 +216,7 @@ export default class Checkpoint {
       return this.next(blockNum);
     }
 
-    await this.handleBlock(block);
+    await this.handleBlock(block, blockEvents);
 
     await this.store.setMetadata(MetadataId.LastIndexedBlock, block.block_number);
 
@@ -236,38 +251,61 @@ export default class Checkpoint {
     return this.cpBlocksCache.shift();
   }
 
-  private async handleBlock(block: api.RPC.GetBlockWithTxs) {
-    if (!('block_number' in block)) return;
+  private async getEvents(blockNumber: number): Promise<EventsMap> {
+    const events: Event[] = [];
 
+    const currentPage = 0;
+    let fetchedAll = false;
+    while (!fetchedAll) {
+      const result = await this.provider.getEvents({
+        from_block: { block_number: blockNumber },
+        to_block: { block_number: blockNumber },
+        page_size: 1000,
+        page_number: currentPage
+      });
+
+      events.push(...result.events);
+
+      fetchedAll = result.is_last_page;
+    }
+
+    return events.reduce((acc, event) => {
+      if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
+
+      acc[event.transaction_hash].push(event);
+
+      return acc;
+    }, {});
+  }
+
+  private async handleBlock(block: FullBlock, blockEvents: EventsMap) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    const receipts = await Promise.all(
-      block.transactions.map(tx => {
-        if (!tx.transaction_hash) return null;
-
-        return this.provider.getTransactionReceipt(tx.transaction_hash);
-      })
-    );
-
     for (const [i, tx] of block.transactions.entries()) {
-      await this.handleTx(block, tx, receipts[i]);
+      await this.handleTx(
+        block,
+        i,
+        tx,
+        tx.transaction_hash ? blockEvents[tx.transaction_hash] || [] : []
+      );
     }
 
     this.log.debug({ blockNumber: block.block_number }, 'handling block done');
   }
 
-  private async handleTx(block, tx, receipt) {
-    this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction');
+  private async handleTx(block: FullBlock, txIndex: number, tx: Transaction, events: Event[]) {
+    this.log.debug({ txIndex }, 'handling transaction');
 
-    if (this.config.tx_fn)
-      await this.writer[this.config.tx_fn]({ block, tx, receipt, mysql: this.mysql });
+    if (this.config.tx_fn) {
+      await this.writer[this.config.tx_fn]({ block, tx, mysql: this.mysql });
+    }
 
     for (const source of this.config.sources || []) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
       if (
-        tx.type === 'DEPLOY' &&
+        isDeployTransaction(tx) &&
         source.deploy_fn &&
         contract === validateAndParseAddress(tx.contract_address)
       ) {
@@ -277,10 +315,10 @@ export default class Checkpoint {
           'found deployment transaction'
         );
 
-        await this.writer[source.deploy_fn]({ source, block, tx, receipt, mysql: this.mysql });
+        await this.writer[source.deploy_fn]({ source, block, tx, mysql: this.mysql });
       }
 
-      for (const event of receipt.events || []) {
+      for (const event of events) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (`0x${starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
@@ -294,7 +332,6 @@ export default class Checkpoint {
                 source,
                 block,
                 tx,
-                receipt,
                 event,
                 mysql: this.mysql
               });
@@ -310,7 +347,7 @@ export default class Checkpoint {
       }
     }
 
-    this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction done');
+    this.log.debug({ txIndex }, 'handling transaction done');
   }
 
   private get store(): CheckpointsStore {
