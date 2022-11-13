@@ -1,6 +1,17 @@
-import { Transaction, TransactionReceipt, GetBlockResponse } from 'starknet';
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
+import type { api } from 'starknet';
+
+// Shortcuts to starknet types.
+export type Block = api.RPC.GetBlockWithTxs;
+export type Transaction = api.RPC.Transaction;
+export type Event = api.RPC.GetEventsResponse['events'][number];
+
+// (Partially) narrowed types as real types are not exported from `starknet`.
+export type FullBlock = Block & { block_number: number };
+export type DeployTransaction = Transaction & { contract_address: string };
+
+export type EventsMap = { [key: string]: Event[] };
 
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
@@ -37,17 +48,11 @@ export interface ContractSourceConfig {
 
 // Configuration used to initialize Checkpoint
 export interface CheckpointConfig {
-  // mainnet-alpha or goerli-alpha network. If not interested
-  // in using the default starknet provider urls, then
-  // leave this undefined and use the network_base_url
-  network?: SupportedNetworkName | string;
-  network_base_url?: string;
+  network_node_url: string;
   start?: number;
   tx_fn?: string;
   sources?: ContractSourceConfig[];
 }
-
-export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
 
 /**
  * Callback function invoked by checkpoint when a contract event
@@ -74,9 +79,8 @@ export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';
  */
 export type CheckpointWriter = (args: {
   tx: Transaction;
-  block: GetBlockResponse;
-  receipt: TransactionReceipt;
-  event?: Array<any>;
+  block: Block;
+  event?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
 }) => Promise<void>;
@@ -90,4 +94,12 @@ export type CheckpointWriter = (args: {
  */
 export interface CheckpointWriters {
   [event: string]: CheckpointWriter;
+}
+
+export function isFullBlock(block: Block): block is FullBlock {
+  return 'block_number' in block;
+}
+
+export function isDeployTransaction(tx: Transaction): tx is DeployTransaction {
+  return tx.type === 'DEPLOY';
 }
