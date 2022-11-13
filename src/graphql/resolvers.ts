@@ -2,11 +2,16 @@ import { GraphQLField, GraphQLList, GraphQLObjectType } from 'graphql';
 import { AsyncMySqlPool } from '../mysql';
 import { getNonNullType } from '../utils/graphql';
 import { Logger } from '../utils/logger';
+import type DataLoader from 'dataloader';
 
-export interface ResolverContext {
+export type ResolverContextInput = {
   log: Logger;
   mysql: AsyncMySqlPool;
-}
+};
+
+export type ResolverContext = ResolverContextInput & {
+  getLoader: (name: string) => DataLoader<readonly unknown[], any>;
+};
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
   const { log, mysql } = context;
@@ -65,16 +70,13 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 }
 
 export async function querySingle(parent, args, context: ResolverContext, info) {
-  const { log, mysql } = context;
-
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
-  const query = `SELECT * FROM ${returnType.name.toLowerCase()}s WHERE id = ? LIMIT 1`;
-  log.debug({ sql: query, args }, 'executing single query');
-
   const id = parent?.[info.fieldName] || args.id;
-  const [item] = await mysql.queryAsync(query, [id]);
+
+  const item = await context.getLoader(returnType.name.toLowerCase()).load(id);
+
   return formatItem(item, jsonFields);
 }
 

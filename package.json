@@ -15,6 +15,7 @@
     "@graphql-tools/schema": "^8.5.1",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
+    "dataloader": "^2.1.0",
     "dotenv": "^16.0.1",
     "eslint": "^8.21.0",
     "express-graphql": "^0.12.0",
