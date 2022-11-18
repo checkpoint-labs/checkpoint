@@ -254,20 +254,19 @@ export default class Checkpoint {
   private async getEvents(blockNumber: number): Promise<EventsMap> {
     const events: Event[] = [];
 
-    const currentPage = 0;
-    let fetchedAll = false;
-    while (!fetchedAll) {
+    let continuationToken: string | undefined;
+    do {
       const result = await this.provider.getEvents({
         from_block: { block_number: blockNumber },
         to_block: { block_number: blockNumber },
-        page_size: 1000,
-        page_number: currentPage
+        chunk_size: 1000,
+        continuation_token: continuationToken
       });
 
       events.push(...result.events);
 
-      fetchedAll = result.is_last_page;
-    }
+      continuationToken = result.continuation_token;
+    } while (continuationToken);
 
     return events.reduce((acc, event) => {
       if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
