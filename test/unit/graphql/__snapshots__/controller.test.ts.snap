@@ -14,18 +14,18 @@ exports[`GqlEntityController createEntityStores should work 1`] = `
 
 DROP TABLE IF EXISTS votes;
 CREATE TABLE votes (
-  id INT(128) NOT NULL,
-  name VARCHAR(128),
-  authenticators JSON,
-  big_number BIGINT,
-  decimal DECIMAL(10, 2),
-  big_decimal DECIMAL(20, 8),
+  \`id\` INT(128) NOT NULL,
+  \`name\` VARCHAR(128),
+  \`authenticators\` JSON,
+  \`big_number\` BIGINT,
+  \`decimal\` DECIMAL(10, 2),
+  \`big_decimal\` DECIMAL(20, 8),
   PRIMARY KEY (id) ,
-  INDEX id (id),
-  INDEX name (name),
-  INDEX big_number (big_number),
-  INDEX decimal (decimal),
-  INDEX big_decimal (big_decimal)
+  INDEX \`id\` (\`id\`),
+  INDEX \`name\` (\`name\`),
+  INDEX \`big_number\` (\`big_number\`),
+  INDEX \`decimal\` (\`decimal\`),
+  INDEX \`big_decimal\` (\`big_decimal\`)
 );",
     ],
   ],
