@@ -79,7 +79,7 @@ export interface CheckpointConfig {
  */
 export type CheckpointWriter = (args: {
   tx: Transaction;
-  block: Block;
+  block: FullBlock;
   event?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
