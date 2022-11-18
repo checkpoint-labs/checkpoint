@@ -199,7 +199,7 @@ export class GqlEntityController {
       this.getTypeFields(type).forEach(field => {
         const sqlType = this.getSqlType(field.type);
 
-        sql += `\n  ${field.name} ${sqlType}`;
+        sql += `\n  \`${field.name}\` ${sqlType}`;
         if (field.type instanceof GraphQLNonNull) {
           sql += ' NOT NULL,';
         } else {
@@ -207,7 +207,7 @@ export class GqlEntityController {
         }
 
         if (!['TEXT', 'JSON'].includes(sqlType)) {
-          sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
+          sqlIndexes += `,\n  INDEX \`${field.name}\` (\`${field.name}\`)`;
         }
       });
       sql += `\n  PRIMARY KEY (id) ${sqlIndexes}\n);\n`;
