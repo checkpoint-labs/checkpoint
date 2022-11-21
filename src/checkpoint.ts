@@ -148,6 +148,7 @@ export default class Checkpoint {
 
     this.config.sources.push(source);
     this.sourceContracts = getContractsFromConfig(this.config);
+    this.cpBlocksCache = [];
   }
 
   /**
