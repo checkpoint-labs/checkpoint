@@ -8,6 +8,7 @@ import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import {
+  ContractSourceConfig,
   Block,
   FullBlock,
   Transaction,
@@ -31,11 +32,11 @@ export default class Checkpoint {
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
-  private readonly sourceContracts: string[];
 
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
   private checkpointsStore?: CheckpointsStore;
+  private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
 
   constructor(
@@ -140,6 +141,29 @@ export default class Checkpoint {
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
     await this.entityController.createEntityStores(this.mysql);
+  }
+
+  public addSource(source: ContractSourceConfig) {
+    if (!this.config.sources) this.config.sources = [];
+
+    this.config.sources.push(source);
+    this.sourceContracts = getContractsFromConfig(this.config);
+    this.cpBlocksCache = [];
+  }
+
+  public executeTemplate(name: string, { contract, start }: { contract: string; start: number }) {
+    const template = this.config.templates?.[name];
+
+    if (!template) {
+      this.log.warn({ name }, 'template not found');
+      return;
+    }
+
+    this.addSource({
+      contract,
+      start,
+      events: template.events
+    });
   }
 
   /**
@@ -296,7 +320,7 @@ export default class Checkpoint {
     this.log.debug({ txIndex }, 'handling transaction');
 
     if (this.config.tx_fn) {
-      await this.writer[this.config.tx_fn]({ block, tx, mysql: this.mysql });
+      await this.writer[this.config.tx_fn]({ block, tx, mysql: this.mysql, instance: this });
     }
 
     for (const source of this.config.sources || []) {
@@ -314,7 +338,13 @@ export default class Checkpoint {
           'found deployment transaction'
         );
 
-        await this.writer[source.deploy_fn]({ source, block, tx, mysql: this.mysql });
+        await this.writer[source.deploy_fn]({
+          source,
+          block,
+          tx,
+          mysql: this.mysql,
+          instance: this
+        });
       }
 
       for (const event of events) {
@@ -332,7 +362,8 @@ export default class Checkpoint {
                 block,
                 tx,
                 event,
-                mysql: this.mysql
+                mysql: this.mysql,
+                instance: this
               });
             }
           }
