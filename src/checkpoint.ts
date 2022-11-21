@@ -151,6 +151,21 @@ export default class Checkpoint {
     this.cpBlocksCache = [];
   }
 
+  public executeTemplate(name: string, { contract, start }: { contract: string; start: number }) {
+    const template = this.config.templates?.[name];
+
+    if (!template) {
+      this.log.warn({ name }, 'template not found');
+      return;
+    }
+
+    this.addSource({
+      contract,
+      start,
+      events: template.events
+    });
+  }
+
   /**
    * Registers the blocks where a contracts event can be found.
    * This will be used as a skip list for checkpoints while

@@ -47,12 +47,17 @@ export interface ContractSourceConfig {
   events: ContractEventConfig[];
 }
 
+export type ContractTemplate = {
+  events: ContractEventConfig[];
+};
+
 // Configuration used to initialize Checkpoint
 export interface CheckpointConfig {
   network_node_url: string;
   start?: number;
   tx_fn?: string;
   sources?: ContractSourceConfig[];
+  templates?: { [key: string]: ContractTemplate };
 }
 
 /**
