@@ -3427,10 +3427,10 @@ stack-utils@^2.0.3:
   dependencies:
     escape-string-regexp "^2.0.0"
 
-starknet@^4.12.0:
-  version "4.12.0"
-  resolved "https://registry.yarnpkg.com/starknet/-/starknet-4.12.0.tgz#174e16f0aee2cc7d07f4038e4e250c6db64727c4"
-  integrity sha512-ECoz+eRh99tKars7COvm7FZkPfA1ok36+e1FhL+eyn8Q5wcHPCr85Cyu6ZZBaMmE6038Gt6gHuPsGI0skj0jxw==
+starknet@^4.13.0:
+  version "4.13.0"
+  resolved "https://registry.yarnpkg.com/starknet/-/starknet-4.13.0.tgz#f64d3a0d24cdf27c8399f485acc8c0a4ded5c77a"
+  integrity sha512-r7s9lUIEc3+0M6D0nb7voaDb5MPz5TxhkQTU+BZMAXqDynj6xWW06Och68XyUZw5bOU16ju4rhYvf4yQb48/zA==
   dependencies:
     "@ethersproject/bytes" "^5.6.1"
     bn.js "^5.2.1"
