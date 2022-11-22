@@ -16,7 +16,7 @@ import { ResolverContextInput } from './resolvers';
  * createGetLoader should be called per-request so each request has its own caching
  * and batching.
  */
-const createGetLoader = (context: ResolverContextInput) => {
+export const createGetLoader = (context: ResolverContextInput) => {
   const loaders = {};
 
   return (name: string) => {

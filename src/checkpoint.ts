@@ -72,12 +72,14 @@ export default class Checkpoint {
     this.mysqlConnection = opts?.dbConnection;
   }
 
-  /**
-   * Returns an express handler that exposes a GraphQL API to query entities defined
-   * in the schema.
-   *
-   */
-  public get graphql() {
+  public getBaseContext() {
+    return {
+      log: this.log.child({ component: 'resolver' }),
+      mysql: this.mysql
+    };
+  }
+
+  public getSchema() {
     const entityQueryFields = this.entityController.generateQueryFields();
     const coreQueryFields = this.entityController.generateQueryFields([
       MetadataGraphQLObject,
@@ -92,19 +94,21 @@ export default class Checkpoint {
       }
     });
 
-    const schema = addResolversToSchema({
+    return addResolversToSchema({
       schema: new GraphQLSchema({ query }),
       resolvers: this.entityController.generateEntityResolvers(entityQueryFields)
     });
+  }
 
-    return getGraphQL(
-      schema,
-      {
-        log: this.log.child({ component: 'resolver' }),
-        mysql: this.mysql
-      },
-      this.entityController.generateSampleQuery()
-    );
+  /**
+   * Returns an express handler that exposes a GraphQL API to query entities defined
+   * in the schema.
+   *
+   */
+  public get graphql() {
+    const schema = this.getSchema();
+
+    return getGraphQL(schema, this.getBaseContext(), this.entityController.generateSampleQuery());
   }
 
   /**
