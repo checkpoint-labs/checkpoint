@@ -1,6 +1,5 @@
 import { RpcProvider } from 'starknet';
-import { starknetKeccak } from 'starknet/utils/hash';
-import { validateAndParseAddress } from 'starknet/utils/address';
+import { validateAndParseAddress, hash } from 'starknet';
 import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
@@ -354,7 +353,7 @@ export default class Checkpoint {
       for (const event of events) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
-            if (`0x${starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
+            if (`0x${hash.starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
               foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },

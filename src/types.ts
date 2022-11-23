@@ -1,12 +1,12 @@
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
-import type { api } from 'starknet';
+import type { RPC } from 'starknet';
 import type Checkpoint from './checkpoint';
 
 // Shortcuts to starknet types.
-export type Block = api.RPC.GetBlockWithTxs;
-export type Transaction = api.RPC.Transaction;
-export type Event = api.RPC.GetEventsResponse['events'][number];
+export type Block = RPC.GetBlockWithTxs;
+export type Transaction = RPC.Transaction;
+export type Event = RPC.GetEventsResponse['events'][number];
 
 // (Partially) narrowed types as real types are not exported from `starknet`.
 export type FullBlock = Block & { block_number: number };
