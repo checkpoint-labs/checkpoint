@@ -1,4 +1,8 @@
-import { GraphQLField, GraphQLList, GraphQLObjectType } from 'graphql';
+import { GraphQLField, GraphQLList, GraphQLObjectType, GraphQLResolveInfo } from 'graphql';
+import {
+  parseResolveInfo,
+  simplifyParsedResolveInfoFragmentWithType
+} from 'graphql-parse-resolve-info';
 import { AsyncMySqlPool } from '../mysql';
 import { getNonNullType } from '../utils/graphql';
 import { Logger } from '../utils/logger';
@@ -69,11 +73,26 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   return result.map(item => formatItem(item, jsonFields));
 }
 
-export async function querySingle(parent, args, context: ResolverContext, info) {
+export async function querySingle(
+  parent,
+  args,
+  context: ResolverContext,
+  info: GraphQLResolveInfo
+) {
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
   const id = parent?.[info.fieldName] || args.id;
+
+  const parsed = parseResolveInfo(info);
+  if (parsed) {
+    // @ts-ignore
+    const simplified = simplifyParsedResolveInfoFragmentWithType(parsed, returnType);
+
+    if (Object.keys(simplified.fields).length === 1 && simplified.fields['id']) {
+      return { id };
+    }
+  }
 
   const item = await context.getLoader(returnType.name.toLowerCase()).load(id);
 
