@@ -2,6 +2,7 @@ import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 import type { RPC } from 'starknet';
 import type Checkpoint from './checkpoint';
+import type { BaseProvider } from './providers';
 
 // Shortcuts to starknet types.
 export type Block = RPC.GetBlockWithTxs;
@@ -28,6 +29,8 @@ export interface CheckpointOptions {
   // Configuration for decimal types
   // defaults to Decimal(10, 2), BigDecimal(20, 8)
   decimalTypes?: { [key: string]: { p: number; d: number } };
+  // BaseProvider based class that defines how blocks are fetched and processed.
+  NetworkProvider?: typeof BaseProvider;
 }
 
 export interface ContractEventConfig {

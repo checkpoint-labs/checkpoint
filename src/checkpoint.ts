@@ -1,23 +1,16 @@
-import { RpcProvider } from 'starknet';
-import { validateAndParseAddress, hash } from 'starknet';
 import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
+import { BaseProvider, StarknetProvider } from './providers';
+
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import {
   ContractSourceConfig,
-  Block,
-  FullBlock,
-  Transaction,
-  Event,
-  EventsMap,
   CheckpointConfig,
   CheckpointOptions,
-  CheckpointWriters,
-  isFullBlock,
-  isDeployTransaction
+  CheckpointWriters
 } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
@@ -27,10 +20,10 @@ export default class Checkpoint {
   public config: CheckpointConfig;
   public writer: CheckpointWriters;
   public schema: string;
-  public provider: RpcProvider;
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
+  private readonly networkProvider: BaseProvider;
 
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
@@ -49,10 +42,6 @@ export default class Checkpoint {
     this.schema = schema;
     this.entityController = new GqlEntityController(schema, opts);
 
-    this.provider = new RpcProvider({
-      nodeUrl: this.config.network_node_url
-    });
-
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
 
@@ -67,6 +56,9 @@ export default class Checkpoint {
           }
         : {})
     });
+
+    const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
+    this.networkProvider = new NetworkProvider({ instance: this, log: this.log });
 
     this.mysqlConnection = opts?.dbConnection;
   }
@@ -194,6 +186,21 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
+  public async setLastIndexedBlock(block: number) {
+    await this.store.setMetadata(MetadataId.LastIndexedBlock, block);
+  }
+
+  public async insertCheckpoints(checkpoints: { blockNumber: number; contractAddress: string }[]) {
+    await this.store.insertCheckpoints(checkpoints);
+  }
+
+  public getWriterParams(): { instance: Checkpoint; mysql: AsyncMySqlPool } {
+    return {
+      instance: this,
+      mysql: this.mysql
+    };
+  }
+
   private async getStartBlockNum() {
     let start = 0;
     let lastBlock = await this.store.getMetadataNumber(MetadataId.LastIndexedBlock);
@@ -219,35 +226,14 @@ export default class Checkpoint {
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
-    let block: Block;
-    let blockEvents: EventsMap;
     try {
-      [block, blockEvents] = await Promise.all([
-        this.provider.getBlockWithTxs(blockNum),
-        this.getEvents(blockNum)
-      ]);
+      await this.networkProvider.processBlock(blockNum);
 
-      if (!isFullBlock(block) || block.block_number !== blockNum) {
-        this.log.error({ blockNumber: blockNum }, 'invalid block');
-        await Promise.delay(12e3);
-        return this.next(blockNum);
-      }
-    } catch (e) {
-      if ((e as Error).message.includes('StarknetErrorCode.BLOCK_NOT_FOUND')) {
-        this.log.info({ blockNumber: blockNum }, 'block not found');
-      } else {
-        this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
-      }
-
+      return this.next(blockNum + 1);
+    } catch (err) {
       await Promise.delay(12e3);
       return this.next(blockNum);
     }
-
-    await this.handleBlock(block, blockEvents);
-
-    await this.store.setMetadata(MetadataId.LastIndexedBlock, block.block_number);
-
-    return this.next(blockNum + 1);
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
@@ -276,111 +262,6 @@ export default class Checkpoint {
 
     this.cpBlocksCache = checkpointBlocks;
     return this.cpBlocksCache.shift();
-  }
-
-  private async getEvents(blockNumber: number): Promise<EventsMap> {
-    const events: Event[] = [];
-
-    let continuationToken: string | undefined;
-    do {
-      const result = await this.provider.getEvents({
-        from_block: { block_number: blockNumber },
-        to_block: { block_number: blockNumber },
-        chunk_size: 1000,
-        continuation_token: continuationToken
-      });
-
-      events.push(...result.events);
-
-      continuationToken = result.continuation_token;
-    } while (continuationToken);
-
-    return events.reduce((acc, event) => {
-      if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
-
-      acc[event.transaction_hash].push(event);
-
-      return acc;
-    }, {});
-  }
-
-  private async handleBlock(block: FullBlock, blockEvents: EventsMap) {
-    this.log.info({ blockNumber: block.block_number }, 'handling block');
-
-    for (const [i, tx] of block.transactions.entries()) {
-      await this.handleTx(
-        block,
-        i,
-        tx,
-        tx.transaction_hash ? blockEvents[tx.transaction_hash] || [] : []
-      );
-    }
-
-    this.log.debug({ blockNumber: block.block_number }, 'handling block done');
-  }
-
-  private async handleTx(block: FullBlock, txIndex: number, tx: Transaction, events: Event[]) {
-    this.log.debug({ txIndex }, 'handling transaction');
-
-    if (this.config.tx_fn) {
-      await this.writer[this.config.tx_fn]({ block, tx, mysql: this.mysql, instance: this });
-    }
-
-    for (const source of this.config.sources || []) {
-      let foundContractData = false;
-      const contract = validateAndParseAddress(source.contract);
-
-      if (
-        isDeployTransaction(tx) &&
-        source.deploy_fn &&
-        contract === validateAndParseAddress(tx.contract_address)
-      ) {
-        foundContractData = true;
-        this.log.info(
-          { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
-          'found deployment transaction'
-        );
-
-        await this.writer[source.deploy_fn]({
-          source,
-          block,
-          tx,
-          mysql: this.mysql,
-          instance: this
-        });
-      }
-
-      for (const event of events) {
-        if (contract === validateAndParseAddress(event.from_address)) {
-          for (const sourceEvent of source.events) {
-            if (`0x${hash.starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
-              foundContractData = true;
-              this.log.info(
-                { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
-                'found contract event'
-              );
-
-              await this.writer[sourceEvent.fn]({
-                source,
-                block,
-                tx,
-                event,
-                mysql: this.mysql,
-                instance: this
-              });
-            }
-          }
-        }
-      }
-
-      if (foundContractData) {
-        await this.store.insertCheckpoints([
-          { blockNumber: block.block_number, contractAddress: source.contract }
-        ]);
-      }
-    }
-
-    this.log.debug({ txIndex }, 'handling transaction done');
   }
 
   private get store(): CheckpointsStore {
