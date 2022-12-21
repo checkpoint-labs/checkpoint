@@ -440,6 +440,10 @@ export class GqlEntityController {
       return 'BIGINT';
     }
 
+    if (type instanceof GraphQLScalarType && type.name === 'Boolean') {
+      return 'BOOLEAN';
+    }
+
     if (type instanceof GraphQLScalarType && this.decimalTypes[type.name]) {
       const decimalType = this.decimalTypes[type.name];
       return `DECIMAL(${decimalType.p}, ${decimalType.d})`;
