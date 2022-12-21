@@ -8,6 +8,7 @@ import {
   GraphQLString
 } from 'graphql';
 import DataLoader from 'dataloader';
+import pluralize from 'pluralize';
 import { ResolverContextInput } from './resolvers';
 
 /**
@@ -22,7 +23,7 @@ export const createGetLoader = (context: ResolverContextInput) => {
   return (name: string) => {
     if (!loaders[name]) {
       loaders[name] = new DataLoader(async ids => {
-        const query = `SELECT * FROM ${name}s WHERE id in (?)`;
+        const query = `SELECT * FROM ${pluralize(name)} WHERE id in (?)`;
 
         context.log.debug({ sql: query, ids }, 'executing batched query');
 
