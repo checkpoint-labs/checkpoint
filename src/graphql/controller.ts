@@ -20,6 +20,7 @@ import {
   isLeafType,
   Source
 } from 'graphql';
+import pluralize from 'pluralize';
 import { AsyncMySqlPool } from '../mysql';
 import {
   generateQueryForEntity,
@@ -192,8 +193,10 @@ export class GqlEntityController {
 
     let sql = '';
     this.schemaObjects.forEach(type => {
-      sql += `\n\nDROP TABLE IF EXISTS ${type.name.toLowerCase()}s;`;
-      sql += `\nCREATE TABLE ${type.name.toLowerCase()}s (`;
+      const tableName = pluralize(pluralize(type.name.toLowerCase()));
+
+      sql += `\n\nDROP TABLE IF EXISTS ${tableName};`;
+      sql += `\nCREATE TABLE ${tableName} (`;
       let sqlIndexes = ``;
 
       this.getTypeFields(type).forEach(field => {
