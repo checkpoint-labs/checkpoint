@@ -14,6 +14,7 @@ export type FullBlock = Block & { block_number: number };
 export type DeployTransaction = Transaction & { contract_address: string };
 
 export type EventsMap = { [key: string]: Event[] };
+export type CompleteEvent = Event & { parsed?: Record<string, string> };
 
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
@@ -38,6 +39,8 @@ export interface ContractEventConfig {
   name: string;
   // callback function in writer
   fn: string;
+  // format of event
+  format?: { name: string; type: string }[];
 }
 
 export interface ContractSourceConfig {
@@ -89,7 +92,7 @@ export interface CheckpointConfig {
 export type CheckpointWriter = (args: {
   tx: Transaction;
   block: FullBlock;
-  event?: Event;
+  event?: CompleteEvent;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
   instance: Checkpoint;
