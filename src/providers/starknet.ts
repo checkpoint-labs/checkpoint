@@ -106,7 +106,14 @@ export class StarknetProvider extends BaseProvider {
 
               const completeEvent: CompleteEvent = event;
               if (sourceEvent.format) {
-                completeEvent.parsed = parseEvent(sourceEvent.format, event.data);
+                try {
+                  completeEvent.parsed = parseEvent(sourceEvent.format, event.data);
+                } catch (err) {
+                  this.log.warn(
+                    { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
+                    'failed to parse event'
+                  );
+                }
               }
 
               await this.instance.writer[sourceEvent.fn]({
