@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`events parseEvent should parse event 1`] = `
+exports[`utils parseEvent should parse event 1`] = `
 Object {
   "authenticators": Array [
     "0x64cce9272197eba6353f5bbf060e097e516b411e66e83a9cf5910a08697df14",

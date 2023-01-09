@@ -1,7 +1,7 @@
-import { parseEvent } from '../../../src/utils/events';
+import { parseEvent } from '../../../../src/providers/starknet/utils';
 import { spaceDeployedEventFormat, spaceDeployedEventData } from './fixtures';
 
-describe('events', () => {
+describe('utils', () => {
   describe('parseEvent', () => {
     it('should parse event', () => {
       const output = parseEvent(spaceDeployedEventFormat, spaceDeployedEventData);

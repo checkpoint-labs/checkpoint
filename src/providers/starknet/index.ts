@@ -1,8 +1,8 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
-import { BaseProvider } from './base';
-import { isFullBlock, isDeployTransaction } from '../types';
-import { parseEvent } from '../utils/events';
-import type { Block, FullBlock, Transaction, Event, CompleteEvent, EventsMap } from '../types';
+import { BaseProvider } from '../base';
+import { isFullBlock, isDeployTransaction } from '../../types';
+import { parseEvent } from './utils';
+import type { Block, FullBlock, Transaction, Event, CompleteEvent, EventsMap } from '../../types';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
