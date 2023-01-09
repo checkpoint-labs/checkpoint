@@ -1,12 +1,21 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
-import { BaseProvider } from '../base';
-import { isFullBlock, isDeployTransaction, ParsedEvent } from '../../types';
+import { BaseProvider, BlockNotFoundError } from '../base';
 import { parseEvent } from './utils';
 import type { Abi } from 'starknet';
-import type { Block, FullBlock, Transaction, Event, EventsMap } from '../../types';
+import { isFullBlock, isDeployTransaction } from '../../types';
+import type {
+  Block,
+  FullBlock,
+  Transaction,
+  PendingTransaction,
+  Event,
+  EventsMap,
+  ParsedEvent
+} from '../../types';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
+  private processedPoolTransactions = new Set();
 
   constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
     super({ instance, log, abis });
@@ -30,12 +39,12 @@ export class StarknetProvider extends BaseProvider {
         throw new Error('invalid block');
       }
     } catch (e) {
-      if ((e as Error).message.includes('StarknetErrorCode.BLOCK_NOT_FOUND')) {
+      if ((e as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
-      } else {
-        this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
+        throw new BlockNotFoundError();
       }
 
+      this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
     }
 
@@ -44,28 +53,82 @@ export class StarknetProvider extends BaseProvider {
     await this.instance.setLastIndexedBlock(block.block_number);
   }
 
-  private async handleBlock(block: FullBlock, blockEvents: EventsMap) {
+  async processPool(blockNumber: number) {
+    const txs = await this.provider.getPendingTransactions();
+    const receipts = await Promise.all(
+      txs.map(async tx => {
+        if (!tx.transaction_hash) return null;
+
+        return this.provider.getTransactionReceipt(tx.transaction_hash);
+      })
+    );
+
+    const eventsMap = receipts.reduce((acc, receipt) => {
+      if (receipt === null) return acc;
+
+      acc[receipt.transaction_hash] = receipt.events;
+      return acc;
+    }, {});
+
+    await this.handlePool(txs, eventsMap, blockNumber);
+  }
+
+  private async handleBlock(block: FullBlock, eventsMap: EventsMap) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    for (const [i, tx] of block.transactions.entries()) {
+    const txsToCheck = block.transactions.filter(
+      tx => !this.processedPoolTransactions.has(tx.transaction_hash)
+    );
+
+    for (const [i, tx] of txsToCheck.entries()) {
       await this.handleTx(
         block,
+        block.block_number,
         i,
         tx,
-        tx.transaction_hash ? blockEvents[tx.transaction_hash] || [] : []
+        tx.transaction_hash ? eventsMap[tx.transaction_hash] || [] : []
       );
     }
+
+    this.processedPoolTransactions.clear();
 
     this.log.debug({ blockNumber: block.block_number }, 'handling block done');
   }
 
-  private async handleTx(block: FullBlock, txIndex: number, tx: Transaction, events: Event[]) {
+  private async handlePool(txs: PendingTransaction[], eventsMap: EventsMap, blockNumber: number) {
+    this.log.info('handling pool');
+
+    const txsToCheck = txs.filter(tx => !this.processedPoolTransactions.has(tx.transaction_hash));
+
+    for (const [i, tx] of txsToCheck.entries()) {
+      await this.handleTx(
+        null,
+        blockNumber,
+        i,
+        tx,
+        tx.transaction_hash ? eventsMap[tx.transaction_hash] || [] : []
+      );
+
+      this.processedPoolTransactions.add(tx.transaction_hash);
+    }
+
+    this.log.info('handling pool done');
+  }
+
+  private async handleTx(
+    block: FullBlock | null,
+    blockNumber: number,
+    txIndex: number,
+    tx: Transaction,
+    events: Event[]
+  ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
     const writerParams = this.instance.getWriterParams();
 
     if (this.instance.config.tx_fn) {
       await this.instance.writer[this.instance.config.tx_fn]({
+        blockNumber,
         block,
         tx,
         ...writerParams
@@ -92,6 +155,7 @@ export class StarknetProvider extends BaseProvider {
 
         await this.instance.writer[handler.fn]({
           block,
+          blockNumber,
           tx,
           rawEvent: event,
           eventIndex,
@@ -118,6 +182,7 @@ export class StarknetProvider extends BaseProvider {
         await this.instance.writer[source.deploy_fn]({
           source,
           block,
+          blockNumber,
           tx,
           ...writerParams
         });
@@ -152,6 +217,7 @@ export class StarknetProvider extends BaseProvider {
               await this.instance.writer[sourceEvent.fn]({
                 source,
                 block,
+                blockNumber,
                 tx,
                 rawEvent: event,
                 event: parsedEvent,
@@ -164,9 +230,7 @@ export class StarknetProvider extends BaseProvider {
       }
 
       if (foundContractData) {
-        await this.instance.insertCheckpoints([
-          { blockNumber: block.block_number, contractAddress: source.contract }
-        ]);
+        await this.instance.insertCheckpoints([{ blockNumber, contractAddress: source.contract }]);
       }
     }
 

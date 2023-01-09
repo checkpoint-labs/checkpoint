@@ -7,6 +7,7 @@ import type { BaseProvider } from './providers';
 // Shortcuts to starknet types.
 export type Block = RPC.GetBlockWithTxs;
 export type Transaction = RPC.Transaction;
+export type PendingTransaction = RPC.PendingTransactions[number];
 export type Event = RPC.GetEventsResponse['events'][number];
 
 // (Partially) narrowed types as real types are not exported from `starknet`.
@@ -64,6 +65,7 @@ export type ContractTemplate = {
 // Configuration used to initialize Checkpoint
 export interface CheckpointConfig {
   network_node_url: string;
+  optimistic_indexing?: boolean;
   start?: number;
   tx_fn?: string;
   global_events?: ContractEventConfig[];
@@ -96,7 +98,8 @@ export interface CheckpointConfig {
  */
 export type CheckpointWriter = (args: {
   tx: Transaction;
-  block: FullBlock;
+  block: FullBlock | null;
+  blockNumber: number;
   event?: ParsedEvent;
   rawEvent?: Event;
   eventIndex?: number;
@@ -120,6 +123,6 @@ export function isFullBlock(block: Block): block is FullBlock {
   return 'block_number' in block;
 }
 
-export function isDeployTransaction(tx: Transaction): tx is DeployTransaction {
+export function isDeployTransaction(tx: Transaction | PendingTransaction): tx is DeployTransaction {
   return tx.type === 'DEPLOY';
 }
