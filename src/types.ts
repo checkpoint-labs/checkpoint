@@ -40,7 +40,7 @@ export interface ContractEventConfig {
   // callback function in writer
   fn: string;
   // format of event
-  format?: { name: string; type: string }[];
+  format?: string | { name: string; type: string }[];
 }
 
 export interface ContractSourceConfig {

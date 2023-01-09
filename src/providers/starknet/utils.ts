@@ -1,23 +1,36 @@
-type Callback<Item> = Item extends { name: infer Name; type: infer Type }
-  ? Name extends PropertyKey
-    ? Record<Name, Type>
-    : never
-  : never;
+type JsonFormat = { name: string; type: string }[];
 
-type Reducer<T extends Array<any>, Acc = Record<string, unknown>> = T extends []
-  ? Acc
-  : T extends [infer Head, ...infer Tail]
-  ? Reducer<Tail, Acc & Callback<Head>>
-  : never;
+const FORMAT_ALIASES = {
+  uint256: 'Uint256'
+};
 
-export const parseEvent = <Item extends { name: string; type: string }, Input extends Item[]>(
-  format: readonly [...Input],
-  input: string[]
-): Reducer<Input> => {
+export const convertFormat = (format: string): JsonFormat => {
+  const parts = format.split(',').map(part => part.trim());
+
+  return parts.map(part => {
+    const matched = part.match(/\((.+)\)/);
+
+    if (!matched) {
+      return {
+        name: part,
+        type: 'felt'
+      };
+    }
+
+    return {
+      name: part.replace(matched[0], '').trim(),
+      type: FORMAT_ALIASES[matched[1]] || matched[1]
+    };
+  });
+};
+
+export const parseEvent = (format: string | JsonFormat, input: string[]): Record<string, any> => {
   let length = 0;
   let current = 0;
 
-  return format.reduce((output, field) => {
+  const jsonFormat = typeof format === 'string' ? convertFormat(format) : format;
+
+  return jsonFormat.reduce((output, field) => {
     if (length > 0) {
       output[field.name] = input.slice(current, current + length);
       current += length;
@@ -43,5 +56,5 @@ export const parseEvent = <Item extends { name: string; type: string }, Input ex
     current++;
 
     return output;
-  }, {}) as Reducer<Input>;
+  }, {});
 };

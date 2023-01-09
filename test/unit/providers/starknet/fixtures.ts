@@ -71,7 +71,10 @@ export const spaceDeployedEventFormat = [
     name: 'metadata_uri',
     type: 'felt*'
   }
-] as const;
+];
+
+export const spaceDeployedEventSimpleFormat =
+  'deployer_address, space_address, voting_delay, min_voting_duration, max_voting_duration, proposal_threshold(uint256), controller, quorum(uint256), voting_strategies_len, voting_strategies(felt*), voting_strategy_params_flat_len, voting_strategy_params_flat(felt*), authenticators_len, authenticators(felt*), execution_strategies_len, execution_strategies(felt*), metadata_uri_len, metadata_uri(felt*)';
 
 export const spaceDeployedEventData = [
   '0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6',
