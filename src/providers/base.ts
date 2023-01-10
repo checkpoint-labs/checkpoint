@@ -17,10 +17,22 @@ type Instance = {
 export class BaseProvider {
   protected readonly instance: Instance;
   protected readonly log: Logger;
+  protected readonly abis: Record<string, any> = {};
 
-  constructor({ instance, log }: { instance: Instance; log: Logger }) {
+  constructor({
+    instance,
+    log,
+    abis
+  }: {
+    instance: Instance;
+    log: Logger;
+    abis?: Record<string, any>;
+  }) {
     this.instance = instance;
     this.log = log;
+    if (abis) {
+      this.abis = abis;
+    }
   }
 
   processBlock(blockNum: number) {

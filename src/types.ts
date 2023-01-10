@@ -30,6 +30,8 @@ export interface CheckpointOptions {
   // Configuration for decimal types
   // defaults to Decimal(10, 2), BigDecimal(20, 8)
   decimalTypes?: { [key: string]: { p: number; d: number } };
+  // Abis for contracts needed for automatic event parsing
+  abis?: Record<string, any>;
   // BaseProvider based class that defines how blocks are fetched and processed.
   NetworkProvider?: typeof BaseProvider;
 }
@@ -39,13 +41,13 @@ export interface ContractEventConfig {
   name: string;
   // callback function in writer
   fn: string;
-  // format of event
-  format?: string | { name: string; type: string }[];
 }
 
 export interface ContractSourceConfig {
   // contract address
   contract: string;
+  // abi name
+  abi?: string;
   // start block number
   start: number;
   // callback function in writer to handle deployment

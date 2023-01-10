@@ -1,81 +1,3 @@
-export const spaceDeployedEventFormat = [
-  {
-    name: 'deployer_address',
-    type: 'felt'
-  },
-  {
-    name: 'space_address',
-    type: 'felt'
-  },
-  {
-    name: 'voting_delay',
-    type: 'felt'
-  },
-  {
-    name: 'min_voting_duration',
-    type: 'felt'
-  },
-  {
-    name: 'max_voting_duration',
-    type: 'felt'
-  },
-  {
-    name: 'proposal_threshold',
-    type: 'Uint256'
-  },
-  {
-    name: 'controller',
-    type: 'felt'
-  },
-  {
-    name: 'quorum',
-    type: 'Uint256'
-  },
-  {
-    name: 'voting_strategies_len',
-    type: 'felt'
-  },
-  {
-    name: 'voting_strategies',
-    type: 'felt*'
-  },
-  {
-    name: 'voting_strategy_params_flat_len',
-    type: 'felt'
-  },
-  {
-    name: 'voting_strategy_params_flat',
-    type: 'felt*'
-  },
-  {
-    name: 'authenticators_len',
-    type: 'felt'
-  },
-  {
-    name: 'authenticators',
-    type: 'felt*'
-  },
-  {
-    name: 'execution_strategies_len',
-    type: 'felt'
-  },
-  {
-    name: 'execution_strategies',
-    type: 'felt*'
-  },
-  {
-    name: 'metadata_uri_len',
-    type: 'felt'
-  },
-  {
-    name: 'metadata_uri',
-    type: 'felt*'
-  }
-];
-
-export const spaceDeployedEventSimpleFormat =
-  'deployer_address, space_address, voting_delay, min_voting_duration, max_voting_duration, proposal_threshold(uint256), controller, quorum(uint256), voting_strategies_len, voting_strategies(felt*), voting_strategy_params_flat_len, voting_strategy_params_flat(felt*), authenticators_len, authenticators(felt*), execution_strategies_len, execution_strategies(felt*), metadata_uri_len, metadata_uri(felt*)';
-
 export const spaceDeployedEventData = [
   '0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6',
   '0x3993631a1336a81c474e2cf5ebbb3e820547ad14e6f6a7afcdac9d35eaccac5',
@@ -107,4 +29,189 @@ export const spaceDeployedEventData = [
   '0x4ecc83848a519cc22b0d0ffb70e65ec8dde85d3d13439eff7145d4063cf6b4d',
   '0x21dda40770f4317582251cffd5a0202d6b223dc167e5c8db25dc887d11eba81',
   '0x0'
+];
+
+export const spaceFactoryAbi = [
+  {
+    name: 'Uint256',
+    size: 2,
+    type: 'struct',
+    members: [
+      {
+        name: 'low',
+        type: 'felt',
+        offset: 0
+      },
+      {
+        name: 'high',
+        type: 'felt',
+        offset: 1
+      }
+    ]
+  },
+  {
+    data: [
+      {
+        name: 'deployer_address',
+        type: 'felt'
+      },
+      {
+        name: 'space_address',
+        type: 'felt'
+      },
+      {
+        name: 'voting_delay',
+        type: 'felt'
+      },
+      {
+        name: 'min_voting_duration',
+        type: 'felt'
+      },
+      {
+        name: 'max_voting_duration',
+        type: 'felt'
+      },
+      {
+        name: 'proposal_threshold',
+        type: 'Uint256'
+      },
+      {
+        name: 'controller',
+        type: 'felt'
+      },
+      {
+        name: 'quorum',
+        type: 'Uint256'
+      },
+      {
+        name: 'voting_strategies_len',
+        type: 'felt'
+      },
+      {
+        name: 'voting_strategies',
+        type: 'felt*'
+      },
+      {
+        name: 'voting_strategy_params_flat_len',
+        type: 'felt'
+      },
+      {
+        name: 'voting_strategy_params_flat',
+        type: 'felt*'
+      },
+      {
+        name: 'authenticators_len',
+        type: 'felt'
+      },
+      {
+        name: 'authenticators',
+        type: 'felt*'
+      },
+      {
+        name: 'execution_strategies_len',
+        type: 'felt'
+      },
+      {
+        name: 'execution_strategies',
+        type: 'felt*'
+      },
+      {
+        name: 'metadata_uri_len',
+        type: 'felt'
+      },
+      {
+        name: 'metadata_uri',
+        type: 'felt*'
+      }
+    ],
+    keys: [],
+    name: 'space_deployed',
+    type: 'event'
+  },
+  {
+    name: 'constructor',
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'space_class_hash',
+        type: 'felt'
+      }
+    ],
+    outputs: []
+  },
+  {
+    name: 'deploySpace',
+    type: 'function',
+    inputs: [
+      {
+        name: 'public_key',
+        type: 'felt'
+      },
+      {
+        name: 'voting_delay',
+        type: 'felt'
+      },
+      {
+        name: 'min_voting_duration',
+        type: 'felt'
+      },
+      {
+        name: 'max_voting_duration',
+        type: 'felt'
+      },
+      {
+        name: 'proposal_threshold',
+        type: 'Uint256'
+      },
+      {
+        name: 'controller',
+        type: 'felt'
+      },
+      {
+        name: 'quorum',
+        type: 'Uint256'
+      },
+      {
+        name: 'voting_strategies_len',
+        type: 'felt'
+      },
+      {
+        name: 'voting_strategies',
+        type: 'felt*'
+      },
+      {
+        name: 'voting_strategy_params_flat_len',
+        type: 'felt'
+      },
+      {
+        name: 'voting_strategy_params_flat',
+        type: 'felt*'
+      },
+      {
+        name: 'authenticators_len',
+        type: 'felt'
+      },
+      {
+        name: 'authenticators',
+        type: 'felt*'
+      },
+      {
+        name: 'execution_strategies_len',
+        type: 'felt'
+      },
+      {
+        name: 'execution_strategies',
+        type: 'felt*'
+      },
+      {
+        name: 'metadata_uri_len',
+        type: 'felt'
+      },
+      {
+        name: 'metadata_uri',
+        type: 'felt*'
+      }
+    ],
+    outputs: []
+  }
 ];
