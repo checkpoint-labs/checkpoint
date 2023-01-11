@@ -1,5 +1,5 @@
 name: Build, test and release
-on: [push]
+on: [push, pull_request]
 jobs:
   build-test:
     runs-on: ubuntu-20.04
