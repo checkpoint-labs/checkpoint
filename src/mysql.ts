@@ -43,9 +43,12 @@ export const createMySqlPool = (connection?: string): AsyncMySqlPool => {
     password: connectionConfig.password,
     host: connectionConfig.hosts[0].name,
     port: connectionConfig.hosts[0].port,
-    ssl: connectionConfig.params?.sslaccept === "strict" ?  {
-           rejectUnauthorized: true
-    } : undefined,
+    ssl:
+      connectionConfig.params?.sslaccept === 'strict'
+        ? {
+            rejectUnauthorized: true
+          }
+        : undefined,
     connectTimeout: 30000, // 30 seconds
     charset: 'utf8mb4',
     supportBigNumbers: true,
