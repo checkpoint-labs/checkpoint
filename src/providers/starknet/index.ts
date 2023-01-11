@@ -1,9 +1,9 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
 import { BaseProvider } from '../base';
-import { isFullBlock, isDeployTransaction } from '../../types';
+import { isFullBlock, isDeployTransaction, ParsedEvent } from '../../types';
 import { parseEvent } from './utils';
 import type { Abi } from 'starknet';
-import type { Block, FullBlock, Transaction, Event, CompleteEvent, EventsMap } from '../../types';
+import type { Block, FullBlock, Transaction, Event, EventsMap } from '../../types';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
@@ -105,10 +105,10 @@ export class StarknetProvider extends BaseProvider {
                 'found contract event'
               );
 
-              const completeEvent: CompleteEvent = event;
+              let parsedEvent: ParsedEvent | undefined;
               if (source.abi && this.abis?.[source.abi]) {
                 try {
-                  completeEvent.parsed = parseEvent(
+                  parsedEvent = parseEvent(
                     this.abis?.[source.abi] as Abi,
                     sourceEvent.name,
                     event.data
@@ -125,7 +125,8 @@ export class StarknetProvider extends BaseProvider {
                 source,
                 block,
                 tx,
-                event: completeEvent,
+                rawEvent: event,
+                event: parsedEvent,
                 ...writerParams
               });
             }

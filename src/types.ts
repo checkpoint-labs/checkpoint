@@ -14,7 +14,7 @@ export type FullBlock = Block & { block_number: number };
 export type DeployTransaction = Transaction & { contract_address: string };
 
 export type EventsMap = { [key: string]: Event[] };
-export type CompleteEvent = Event & { parsed?: Record<string, string> };
+export type ParsedEvent = Record<string, any>;
 
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
@@ -94,7 +94,8 @@ export interface CheckpointConfig {
 export type CheckpointWriter = (args: {
   tx: Transaction;
   block: FullBlock;
-  event?: CompleteEvent;
+  event?: ParsedEvent;
+  rawEvent?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
   instance: Checkpoint;
