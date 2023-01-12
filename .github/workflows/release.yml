@@ -1,8 +1,15 @@
-name: Build, test and release
-on: [push, pull_request]
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Run tests]
+    types: [completed]
+    branches: [master]
+
 jobs:
-  build-test:
+  release:
     runs-on: ubuntu-20.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
@@ -10,9 +17,7 @@ jobs:
           node-version: '14'
           cache: 'yarn'
       - run: yarn install
-      - run: yarn lint
       - run: yarn build
-      - run: yarn test
       - id: publish
         name: Release to NPM
         if: github.ref == 'refs/heads/master'
