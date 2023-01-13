@@ -1,13 +1,15 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
-import { BaseProvider } from './base';
-import { isFullBlock, isDeployTransaction } from '../types';
-import type { Block, FullBlock, Transaction, Event, EventsMap } from '../types';
+import { BaseProvider } from '../base';
+import { isFullBlock, isDeployTransaction, ParsedEvent } from '../../types';
+import { parseEvent } from './utils';
+import type { Abi } from 'starknet';
+import type { Block, FullBlock, Transaction, Event, EventsMap } from '../../types';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
 
-  constructor({ instance, log }: ConstructorParameters<typeof BaseProvider>[0]) {
-    super({ instance, log });
+  constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
+    super({ instance, log, abis });
 
     this.provider = new RpcProvider({
       nodeUrl: this.instance.config.network_node_url
@@ -103,11 +105,28 @@ export class StarknetProvider extends BaseProvider {
                 'found contract event'
               );
 
+              let parsedEvent: ParsedEvent | undefined;
+              if (source.abi && this.abis?.[source.abi]) {
+                try {
+                  parsedEvent = parseEvent(
+                    this.abis?.[source.abi] as Abi,
+                    sourceEvent.name,
+                    event.data
+                  );
+                } catch (err) {
+                  this.log.warn(
+                    { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
+                    'failed to parse event'
+                  );
+                }
+              }
+
               await this.instance.writer[sourceEvent.fn]({
                 source,
                 block,
                 tx,
-                event,
+                rawEvent: event,
+                event: parsedEvent,
                 ...writerParams
               });
             }

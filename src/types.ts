@@ -14,6 +14,7 @@ export type FullBlock = Block & { block_number: number };
 export type DeployTransaction = Transaction & { contract_address: string };
 
 export type EventsMap = { [key: string]: Event[] };
+export type ParsedEvent = Record<string, any>;
 
 export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Error.
@@ -29,6 +30,8 @@ export interface CheckpointOptions {
   // Configuration for decimal types
   // defaults to Decimal(10, 2), BigDecimal(20, 8)
   decimalTypes?: { [key: string]: { p: number; d: number } };
+  // Abis for contracts needed for automatic event parsing
+  abis?: Record<string, any>;
   // BaseProvider based class that defines how blocks are fetched and processed.
   NetworkProvider?: typeof BaseProvider;
 }
@@ -43,6 +46,8 @@ export interface ContractEventConfig {
 export interface ContractSourceConfig {
   // contract address
   contract: string;
+  // abi name
+  abi?: string;
   // start block number
   start: number;
   // callback function in writer to handle deployment
@@ -89,7 +94,8 @@ export interface CheckpointConfig {
 export type CheckpointWriter = (args: {
   tx: Transaction;
   block: FullBlock;
-  event?: Event;
+  event?: ParsedEvent;
+  rawEvent?: Event;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
   instance: Checkpoint;

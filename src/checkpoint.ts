@@ -58,7 +58,7 @@ export default class Checkpoint {
     });
 
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
-    this.networkProvider = new NetworkProvider({ instance: this, log: this.log });
+    this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
 
     this.mysqlConnection = opts?.dbConnection;
   }
