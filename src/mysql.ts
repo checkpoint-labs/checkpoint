@@ -36,7 +36,6 @@ export const createMySqlPool = (connection?: string): AsyncMySqlPool => {
   }
 
   const config: PoolConfig = {
-    connectionLimit: 1,
     multipleStatements: true,
     database: connectionConfig.path[0],
     user: connectionConfig.user,
