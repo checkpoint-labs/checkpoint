@@ -64,6 +64,7 @@ export interface CheckpointConfig {
   network_node_url: string;
   start?: number;
   tx_fn?: string;
+  globalEvents?: ContractEventConfig[];
   sources?: ContractSourceConfig[];
   templates?: { [key: string]: ContractTemplate };
 }
@@ -96,6 +97,7 @@ export type CheckpointWriter = (args: {
   block: FullBlock;
   event?: ParsedEvent;
   rawEvent?: Event;
+  eventIndex?: number;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
   instance: Checkpoint;
