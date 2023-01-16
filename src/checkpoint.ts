@@ -208,7 +208,7 @@ export default class Checkpoint {
 
     const nextBlock = lastBlock + 1;
 
-    if (this.config.tx_fn) {
+    if (this.config.tx_fn || this.config.globalEvents) {
       if (this.config.start) start = this.config.start;
     } else {
       (this.config.sources || []).forEach(source => {
@@ -219,7 +219,7 @@ export default class Checkpoint {
   }
 
   private async next(blockNum: number) {
-    if (!this.config.tx_fn) {
+    if (!this.config.tx_fn && !this.config.globalEvents) {
       const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
       if (checkpointBlock) blockNum = checkpointBlock;
     }

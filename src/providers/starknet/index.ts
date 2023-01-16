@@ -72,6 +72,34 @@ export class StarknetProvider extends BaseProvider {
       });
     }
 
+    if (this.instance.config.globalEvents) {
+      const globalEventHandlers = this.instance.config.globalEvents.reduce((handlers, event) => {
+        handlers[`0x${hash.starknetKeccak(event.name).toString('hex')}`] = {
+          name: event.name,
+          fn: event.fn
+        };
+        return handlers;
+      }, {});
+
+      for (const [eventIndex, event] of events.entries()) {
+        const handler = globalEventHandlers[event.keys[0]];
+        if (!handler) continue;
+
+        this.log.info(
+          { contract: event.from_address, event: handler.name, handlerFn: handler.fn },
+          'found contract event'
+        );
+
+        await this.instance.writer[handler.fn]({
+          block,
+          tx,
+          rawEvent: event,
+          eventIndex,
+          ...writerParams
+        });
+      }
+    }
+
     for (const source of this.instance.config.sources || []) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
@@ -95,7 +123,7 @@ export class StarknetProvider extends BaseProvider {
         });
       }
 
-      for (const event of events) {
+      for (const [eventIndex, event] of events.entries()) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (`0x${hash.starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
@@ -127,6 +155,7 @@ export class StarknetProvider extends BaseProvider {
                 tx,
                 rawEvent: event,
                 event: parsedEvent,
+                eventIndex,
                 ...writerParams
               });
             }
