@@ -1,4 +1,12 @@
-import { GraphQLField, GraphQLList, GraphQLObjectType, GraphQLResolveInfo } from 'graphql';
+import {
+  GraphQLField,
+  GraphQLList,
+  GraphQLNonNull,
+  GraphQLObjectType,
+  GraphQLResolveInfo,
+  GraphQLScalarType,
+  isListType
+} from 'graphql';
 import {
   parseResolveInfo,
   simplifyParsedResolveInfoFragmentWithType
@@ -15,7 +23,7 @@ export type ResolverContextInput = {
 };
 
 export type ResolverContext = ResolverContextInput & {
-  getLoader: (name: string) => DataLoader<readonly unknown[], any>;
+  getLoader: (name: string, field?: string) => DataLoader<readonly unknown[], any>;
 };
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
@@ -97,13 +105,44 @@ export async function querySingle(
     }
   }
 
-  const item = await context.getLoader(returnType.name.toLowerCase()).load(id);
+  const items = await context.getLoader(returnType.name.toLowerCase()).load(id);
+  if (items.length === 0) {
+    throw new Error(`Row not found: ${id}`);
+  }
 
-  return formatItem(item, jsonFields);
+  return formatItem(items[0], jsonFields);
 }
 
+export const getNestedResolver = (columnName: string) =>
+  async function queryNested(parent, args, context: ResolverContext, info: GraphQLResolveInfo) {
+    const returnType = getNonNullType(info.returnType) as GraphQLList<GraphQLObjectType>;
+    const jsonFields = getJsonFields(returnType.ofType);
+
+    const parentType = getNonNullType(info.parentType) as GraphQLObjectType;
+    const field = parentType.getFields()[info.fieldName];
+
+    const fieldType =
+      info.returnType instanceof GraphQLNonNull ? info.returnType.ofType : info.returnType;
+    if (!isListType(fieldType)) return [];
+
+    const directives = field.astNode?.directives ?? [];
+    const derivedFromDirective = directives.find(dir => dir.name.value === 'derivedFrom');
+    if (!derivedFromDirective) {
+      throw new Error(`field ${field.name} is missing derivedFrom directive`);
+    }
+    const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
+    if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
+      throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
+    }
+
+    const result = await context.getLoader(columnName, fieldArgument.value.value).load(parent.id);
+    return result.map(item => formatItem(item, jsonFields));
+  };
+
 function getJsonFields(type: GraphQLObjectType) {
-  return Object.values(type.getFields()).filter(field => field.type instanceof GraphQLList);
+  return Object.values(type.getFields()).filter(
+    field => isListType(field.type) && field.type.ofType instanceof GraphQLScalarType
+  );
 }
 
 function formatItem(item: Record<string, any>, jsonFields: GraphQLField<any, any>[]) {

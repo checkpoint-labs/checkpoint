@@ -18,6 +18,7 @@ import {
   GraphQLSchema,
   GraphQLString,
   isLeafType,
+  isListType,
   Source
 } from 'graphql';
 import pluralize from 'pluralize';
@@ -29,7 +30,7 @@ import {
   getNonNullType
 } from '../utils/graphql';
 import { CheckpointOptions } from '../types';
-import { querySingle, queryMulti, ResolverContext } from './resolvers';
+import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
 
 /**
  * Type for single and multiple query resolvers
@@ -150,9 +151,15 @@ export class GqlEntityController {
     return this.schemaObjects.reduce((entities, obj) => {
       entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
         const nonNullType = getNonNullType(field.type);
-        if (!(nonNullType instanceof GraphQLObjectType)) return resolvers;
 
-        resolvers[field.name] = fields[singleEntityQueryName(nonNullType)].resolve;
+        if (isListType(nonNullType) && nonNullType.ofType instanceof GraphQLObjectType) {
+          resolvers[field.name] = getNestedResolver(multiEntityQueryName(nonNullType.ofType));
+        }
+
+        if (nonNullType instanceof GraphQLObjectType) {
+          resolvers[field.name] = fields[singleEntityQueryName(nonNullType)].resolve;
+        }
+
         return resolvers;
       }, {});
 
@@ -200,6 +207,9 @@ export class GqlEntityController {
       let sqlIndexes = ``;
 
       this.getTypeFields(type).forEach(field => {
+        const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+        if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
+
         const sqlType = this.getSqlType(field.type);
 
         sql += `\n  \`${field.name}\` ${sqlType}`;
