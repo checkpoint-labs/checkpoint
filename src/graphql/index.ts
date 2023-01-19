@@ -20,21 +20,28 @@ import { ResolverContextInput } from './resolvers';
 export const createGetLoader = (context: ResolverContextInput) => {
   const loaders = {};
 
-  return (name: string) => {
-    if (!loaders[name]) {
-      loaders[name] = new DataLoader(async ids => {
-        const query = `SELECT * FROM ${pluralize(name)} WHERE id in (?)`;
+  return (name: string, field = 'id') => {
+    const key = `${name}-${field}`;
 
+    if (!loaders[key]) {
+      loaders[key] = new DataLoader(async ids => {
+        const query = `SELECT * FROM ${pluralize(name)} WHERE ${field} in (?)`;
         context.log.debug({ sql: query, ids }, 'executing batched query');
 
         const results = await context.mysql.queryAsync(query, [ids]);
-        const resultsMap = Object.fromEntries(results.map(result => [result.id, result]));
+        const resultsMap = results.reduce((acc, result) => {
+          if (!acc[result[field]]) acc[result[field]] = [];
 
-        return ids.map((id: any) => resultsMap[id] || new Error(`Row not found: ${id}`));
+          acc[result[field]].push(result);
+
+          return acc;
+        }, {});
+
+        return ids.map((id: any) => resultsMap[id] || []);
       });
     }
 
-    return loaders[name];
+    return loaders[key];
   };
 };
 

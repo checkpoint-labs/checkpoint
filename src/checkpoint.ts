@@ -39,8 +39,9 @@ export default class Checkpoint {
   ) {
     this.config = config;
     this.writer = writer;
-    this.schema = schema;
-    this.entityController = new GqlEntityController(schema, opts);
+    this.schema = this.extendSchema(schema);
+
+    this.entityController = new GqlEntityController(this.schema, opts);
 
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
@@ -279,5 +280,10 @@ export default class Checkpoint {
 
     // lazy initialization of mysql connection
     return (this.mysqlPool = createMySqlPool(this.mysqlConnection));
+  }
+
+  private extendSchema(schema: string): string {
+    return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
+${schema}`;
   }
 }

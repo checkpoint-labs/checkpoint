@@ -3,7 +3,8 @@ import {
   GraphQLOutputType,
   GraphQLNonNull,
   isLeafType,
-  isWrappingType
+  isListType,
+  GraphQLScalarType
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
@@ -32,10 +33,14 @@ export const generateQueryForEntity = (entity: GraphQLObjectType): string => {
 
     Object.keys(objectFields).forEach(fieldName => {
       const rawFieldType = objectFields[fieldName].type;
-      const fieldType = isWrappingType(rawFieldType) ? rawFieldType.ofType : rawFieldType;
+      const fieldType = rawFieldType instanceof GraphQLNonNull ? rawFieldType.ofType : rawFieldType;
 
       if (isLeafType(fieldType)) {
         queryFields[fieldName] = true;
+      } else if (isListType(fieldType)) {
+        if (fieldType.ofType instanceof GraphQLScalarType) {
+          queryFields[fieldName] = true;
+        }
       } else {
         const childObjectFields = {};
         getObjectFields(fieldType as GraphQLObjectType, childObjectFields);
