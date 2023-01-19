@@ -56,6 +56,8 @@ export interface ContractSourceConfig {
 }
 
 export type ContractTemplate = {
+  // abi name
+  abi?: string;
   events: ContractEventConfig[];
 };
 

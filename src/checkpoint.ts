@@ -158,6 +158,7 @@ export default class Checkpoint {
     this.addSource({
       contract,
       start,
+      abi: template.abi,
       events: template.events
     });
   }
