@@ -64,7 +64,7 @@ export interface CheckpointConfig {
   network_node_url: string;
   start?: number;
   tx_fn?: string;
-  globalEvents?: ContractEventConfig[];
+  global_events?: ContractEventConfig[];
   sources?: ContractSourceConfig[];
   templates?: { [key: string]: ContractTemplate };
 }
