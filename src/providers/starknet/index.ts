@@ -72,8 +72,8 @@ export class StarknetProvider extends BaseProvider {
       });
     }
 
-    if (this.instance.config.globalEvents) {
-      const globalEventHandlers = this.instance.config.globalEvents.reduce((handlers, event) => {
+    if (this.instance.config.global_events) {
+      const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
         handlers[`0x${hash.starknetKeccak(event.name).toString('hex')}`] = {
           name: event.name,
           fn: event.fn
