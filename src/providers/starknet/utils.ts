@@ -16,7 +16,7 @@ export const parseStruct = (
 
   return struct.members.reduce((output, field) => {
     if (structs[field.type]) {
-      output[field.name] = parseStruct(field.type, data, { current, structs });
+      output[field.name] = parseStruct(field.type, data, { current: structCurrent, structs });
       structCurrent += structs[field.type].size;
 
       return output;
