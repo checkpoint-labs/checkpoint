@@ -19,8 +19,11 @@ export const singleEntityQueryName = (entity: GraphQLObjectType) => entity.name.
  * Returns name of query for fetching multiple entity records
  *
  */
-export const multiEntityQueryName = (entity: GraphQLObjectType) =>
-  pluralize(entity.name.toLowerCase());
+export const multiEntityQueryName = (entity: GraphQLObjectType) => {
+  if (entity.name === '_Metadata') return '_metadatas';
+
+  return pluralize(entity.name.toLowerCase());
+};
 
 /**
  * Generate sample query string based on entity object fields.

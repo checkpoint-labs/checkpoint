@@ -11,9 +11,9 @@ import {
   parseResolveInfo,
   simplifyParsedResolveInfoFragmentWithType
 } from 'graphql-parse-resolve-info';
-import pluralize from 'pluralize';
 import { AsyncMySqlPool } from '../mysql';
 import { getNonNullType } from '../utils/graphql';
+import { getTableName } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
 
@@ -75,7 +75,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 
   params.push(skip, first);
 
-  const query = `SELECT * FROM ${pluralize(
+  const query = `SELECT * FROM ${getTableName(
     returnType.name.toLowerCase()
   )} ${whereSql} ${orderBySql} LIMIT ?, ?`;
   log.debug({ sql: query, args }, 'executing multi query');
