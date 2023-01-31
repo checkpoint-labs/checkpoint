@@ -8,8 +8,8 @@ import {
   GraphQLString
 } from 'graphql';
 import DataLoader from 'dataloader';
-import pluralize from 'pluralize';
 import { ResolverContextInput } from './resolvers';
+import { getTableName } from '../utils/database';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -25,7 +25,7 @@ export const createGetLoader = (context: ResolverContextInput) => {
 
     if (!loaders[key]) {
       loaders[key] = new DataLoader(async ids => {
-        const query = `SELECT * FROM ${pluralize(name)} WHERE ${field} in (?)`;
+        const query = `SELECT * FROM ${getTableName(name)} WHERE ${field} in (?)`;
         context.log.debug({ sql: query, ids }, 'executing batched query');
 
         const results = await context.mysql.queryAsync(query, [ids]);
