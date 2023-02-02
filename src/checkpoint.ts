@@ -19,6 +19,7 @@ import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 export default class Checkpoint {
   public config: CheckpointConfig;
   public writer: CheckpointWriters;
+  public opts?: CheckpointOptions;
   public schema: string;
 
   private readonly entityController: GqlEntityController;
@@ -39,7 +40,10 @@ export default class Checkpoint {
   ) {
     this.config = config;
     this.writer = writer;
+    this.opts = opts;
     this.schema = this.extendSchema(schema);
+
+    this.validateConfig();
 
     this.entityController = new GqlEntityController(this.schema, opts);
 
@@ -286,5 +290,36 @@ export default class Checkpoint {
   private extendSchema(schema: string): string {
     return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
 ${schema}`;
+  }
+
+  private validateConfig() {
+    const sources = this.config.sources ?? [];
+    const templates = Object.values(this.config.templates ?? {});
+
+    const usedAbis = [
+      ...sources.map(source => source.abi),
+      ...templates.map(template => template.abi)
+    ].filter(abi => abi) as string[];
+    const usedWriters = [
+      ...sources.flatMap(source => source.events),
+      ...templates.flatMap(template => template.events)
+    ];
+
+    const missingAbis = usedAbis.filter(abi => !this.opts?.abis?.[abi]);
+    const missingWriters = usedWriters.filter(writer => !this.writer[writer.fn]);
+
+    if (missingAbis.length > 0) {
+      throw new Error(
+        `Following ABIs are used (${missingAbis.join(', ')}), but they are missing in opts.abis`
+      );
+    }
+
+    if (missingWriters.length > 0) {
+      throw new Error(
+        `Following writers are used (${missingWriters
+          .map(writer => writer.fn)
+          .join(', ')}), but they are not defined`
+      );
+    }
   }
 }
