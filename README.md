@@ -4,7 +4,7 @@ Checkpoint is a library for indexing data of StarkNet contracts and making it ac
 
 ## Installation
 
-Checkpoint is an NPM package that can be installed through the follow command:
+Checkpoint is an NPM package that can be installed through the following command:
 
 ```tsx
 npm install @snapshot-labs/checkpoint
