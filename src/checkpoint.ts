@@ -2,7 +2,7 @@ import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
-import { BaseProvider, StarknetProvider } from './providers';
+import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
@@ -15,6 +15,8 @@ import {
 import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 import { GraphQLObjectType, GraphQLSchema } from 'graphql';
+
+const REFRESH_INTERVAL = 7000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -237,7 +239,13 @@ export default class Checkpoint {
 
       return this.next(blockNum + 1);
     } catch (err) {
-      await Promise.delay(12e3);
+      if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
+        try {
+          await this.networkProvider.processPool(blockNum);
+        } catch (err) {}
+      }
+
+      await Promise.delay(REFRESH_INTERVAL);
       return this.next(blockNum);
     }
   }

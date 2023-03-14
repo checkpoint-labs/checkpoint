@@ -14,6 +14,13 @@ type Instance = {
   };
 };
 
+export class BlockNotFoundError extends Error {
+  constructor() {
+    super('Block not found');
+    this.name = 'BlockNotFoundError';
+  }
+}
+
 export class BaseProvider {
   protected readonly instance: Instance;
   protected readonly log: Logger;
@@ -37,5 +44,11 @@ export class BaseProvider {
 
   processBlock(blockNum: number) {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
+  }
+
+  processPool(blockNumber: number) {
+    throw new Error(
+      `processPool method was not defined when fetching pool for block ${blockNumber}`
+    );
   }
 }
