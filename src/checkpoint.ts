@@ -284,7 +284,7 @@ export default class Checkpoint {
       return this.checkpointsStore;
     }
 
-    return (this.checkpointsStore = new CheckpointsStore(this.mysql, this.log));
+    return (this.checkpointsStore = new CheckpointsStore(knex, this.log));
   }
 
   private get mysql(): AsyncMySqlPool {

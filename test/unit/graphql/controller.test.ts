@@ -66,9 +66,9 @@ type Vote {
   big_decimal: BigDecimal
 }
   `);
-      const schemaBuilder = controller.createEntityStores(mockKnex);
+      const { builder } = await controller.createEntityStores(mockKnex);
 
-      expect(schemaBuilder.toString()).toMatchSnapshot();
+      expect(builder.toString()).toMatchSnapshot();
     });
   });
 

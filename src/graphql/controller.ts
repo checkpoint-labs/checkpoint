@@ -194,11 +194,11 @@ export class GqlEntityController {
    * ```
    *
    */
-  public createEntityStores(knex: Knex): Knex.SchemaBuilder {
+  public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
     if (this.schemaObjects.length === 0) {
-      return builder;
+      return { builder };
     }
 
     this.schemaObjects.map(type => {
@@ -226,7 +226,9 @@ export class GqlEntityController {
       });
     });
 
-    return builder;
+    await builder;
+
+    return { builder };
   }
 
   /**
