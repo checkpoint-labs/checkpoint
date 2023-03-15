@@ -11,7 +11,7 @@ import {
   parseResolveInfo,
   simplifyParsedResolveInfoFragmentWithType
 } from 'graphql-parse-resolve-info';
-import { AsyncMySqlPool } from '../mysql';
+import { Knex } from 'knex';
 import { getNonNullType } from '../utils/graphql';
 import { getTableName } from '../utils/database';
 import { Logger } from '../utils/logger';
@@ -19,7 +19,7 @@ import type DataLoader from 'dataloader';
 
 export type ResolverContextInput = {
   log: Logger;
-  mysql: AsyncMySqlPool;
+  knex: Knex;
 };
 
 export type ResolverContext = ResolverContextInput & {
@@ -27,60 +27,51 @@ export type ResolverContext = ResolverContextInput & {
 };
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
-  const { log, mysql } = context;
-  const params: any = [];
-  let whereSql = '';
+  const { log, knex } = context;
 
   const returnType = info.returnType.ofType as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
-  if (args.where) {
-    Object.entries(args.where).map(w => {
-      whereSql += !whereSql ? `WHERE ` : ` AND `;
-      let param = w[1];
+  const tableName = getTableName(returnType.name.toLowerCase());
 
+  let query = knex.select('*').from(tableName);
+
+  if (args.where) {
+    Object.entries(args.where).map((w: [string, any]) => {
+      // TODO: we could generate args.where as objects { name, column, operator, value }
+      // so we don't have to cut it there
       if (w[0].endsWith('_not')) {
-        whereSql += `\`${w[0].slice(0, -4)}\` != ?`;
+        query = query.where(w[0].slice(0, -4), '!=', w[1]);
       } else if (w[0].endsWith('_gt')) {
-        whereSql += `\`${w[0].slice(0, -3)}\` > ?`;
+        query = query.where(w[0].slice(0, -3), '>', w[1]);
       } else if (w[0].endsWith('_gte')) {
-        whereSql += `\`${w[0].slice(0, -4)}\` >= ?`;
+        query = query.where(w[0].slice(0, -4), '>=', w[1]);
       } else if (w[0].endsWith('_lt')) {
-        whereSql += `\`${w[0].slice(0, -3)}\` < ?`;
+        query = query.where(w[0].slice(0, -3), '<', w[1]);
       } else if (w[0].endsWith('_lte')) {
-        whereSql += `\`${w[0].slice(0, -4)}\` <= ?`;
+        query = query.where(w[0].slice(0, -4), '<=', w[1]);
       } else if (w[0].endsWith('_not_contains')) {
-        whereSql += `\`${w[0].slice(0, -13)}\` NOT LIKE ?`;
-        param = `%${w[1]}%`;
+        query = query.not.whereLike(w[0].slice(0, -13), `%${w[1]}%`);
       } else if (w[0].endsWith('_contains')) {
-        whereSql += `\`${w[0].slice(0, -9)}\` LIKE ?`;
-        param = `%${w[1]}%`;
+        query = query.whereLike(w[0].slice(0, -9), `%${w[1]}%`);
       } else if (w[0].endsWith('_not_in')) {
-        whereSql += `\`${w[0].slice(0, -7)}\` NOT IN (?)`;
+        query = query.not.whereIn(w[0].slice(0, -7), w[1]);
       } else if (w[0].endsWith('_in')) {
-        whereSql += `\`${w[0].slice(0, -3)}\` IN (?)`;
+        query = query.whereIn(w[0].slice(0, -3), w[1] as any);
       } else {
-        whereSql += `\`${w[0]}\` = ?`;
+        query = query.where(w[0], w[1]);
       }
-      params.push(param);
     });
   }
-  const first = args?.first || 1000;
-  const skip = args?.skip || 0;
 
-  let orderBySql = '';
   if (args.orderBy) {
-    orderBySql = `ORDER BY ${args.orderBy} ${args.orderDirection || 'DESC'}`;
+    query = query.orderBy(args.orderBy, args.orderDirection.toLowerCase() || 'desc');
   }
 
-  params.push(skip, first);
+  query = query.limit(args?.first || 1000).offset(args?.skip || 0);
+  log.debug({ sql: query.toQuery(), args }, 'executing multi query');
 
-  const query = `SELECT * FROM ${getTableName(
-    returnType.name.toLowerCase()
-  )} ${whereSql} ${orderBySql} LIMIT ?, ?`;
-  log.debug({ sql: query, args }, 'executing multi query');
-
-  const result = await mysql.queryAsync(query, params);
+  const result = await query;
   return result.map(item => formatItem(item, jsonFields));
 }
 
