@@ -1,4 +1,4 @@
-import { AsyncMySqlPool } from './mysql';
+import { Knex } from 'knex';
 import { LogLevel } from './utils/logger';
 import type { RPC } from 'starknet';
 import type Checkpoint from './checkpoint';
@@ -104,7 +104,7 @@ export type CheckpointWriter = (args: {
   rawEvent?: Event;
   eventIndex?: number;
   source?: ContractSourceConfig;
-  mysql: AsyncMySqlPool;
+  knex: Knex;
   instance: Checkpoint;
 }) => Promise<void>;
 

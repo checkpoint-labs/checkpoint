@@ -1,12 +1,12 @@
 import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
+import { Knex } from 'knex';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 
 import { createLogger, Logger, LogLevel } from './utils/logger';
-import knex from './knex';
-import { AsyncMySqlPool, createMySqlPool } from './mysql';
+import { createKnex } from './knex';
 import {
   ContractSourceConfig,
   CheckpointConfig,
@@ -29,8 +29,7 @@ export default class Checkpoint {
   private readonly log: Logger;
   private readonly networkProvider: BaseProvider;
 
-  private mysqlPool?: AsyncMySqlPool;
-  private mysqlConnection?: string;
+  private knex: Knex;
   private checkpointsStore?: CheckpointsStore;
   private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
@@ -68,14 +67,20 @@ export default class Checkpoint {
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
     this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
 
-    this.mysqlConnection = opts?.dbConnection;
+    const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
+    if (!dbConnection) {
+      throw new Error(
+        'a valid connection string or DATABASE_URL environment variable is required to connect to the database'
+      );
+    }
+
+    this.knex = createKnex(dbConnection);
   }
 
   public getBaseContext() {
     return {
       log: this.log.child({ component: 'resolver' }),
-      mysql: this.mysql,
-      knex
+      knex: this.knex
     };
   }
 
@@ -144,7 +149,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
-    await this.entityController.createEntityStores(knex);
+    await this.entityController.createEntityStores(this.knex);
   }
 
   public addSource(source: ContractSourceConfig) {
@@ -204,10 +209,10 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
-  public getWriterParams(): { instance: Checkpoint; mysql: AsyncMySqlPool } {
+  public getWriterParams(): { instance: Checkpoint; knex: Knex } {
     return {
       instance: this,
-      mysql: this.mysql
+      knex: this.knex
     };
   }
 
@@ -285,16 +290,7 @@ export default class Checkpoint {
       return this.checkpointsStore;
     }
 
-    return (this.checkpointsStore = new CheckpointsStore(knex, this.log));
-  }
-
-  private get mysql(): AsyncMySqlPool {
-    if (this.mysqlPool) {
-      return this.mysqlPool;
-    }
-
-    // lazy initialization of mysql connection
-    return (this.mysqlPool = createMySqlPool(this.mysqlConnection));
+    return (this.checkpointsStore = new CheckpointsStore(this.knex, this.log));
   }
 
   private extendSchema(schema: string): string {
