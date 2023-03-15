@@ -24,7 +24,7 @@ export interface CheckpointOptions {
   // optionally format logs to pretty output.
   // Not recommended for production.
   prettifyLogs?: boolean;
-  // Optional database connection string. For now only accepts mysql database
+  // Optional database connection string. For now only accepts PostgreSQL and MySQL/MariaDB
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
   dbConnection?: string;
@@ -75,7 +75,7 @@ export interface CheckpointConfig {
 
 /**
  * Callback function invoked by checkpoint when a contract event
- * is encountered. A writer function should use the `mysql`
+ * is encountered. A writer function should use the `knex`
  * object to write to the database entities based on the require logic.
  *
  * For example, if a graphql Entity is defined in the schema:
@@ -89,7 +89,7 @@ export interface CheckpointConfig {
  *
  * Then you can insert into the entity into the database like:
  * ```typescript
- * await args.mysql.queryAsync('INSERT INTO votes VALUES(?, ?);', ['voteId', 'voters-address']);
+ * await knex.table('votes').insert({ id: 'voteId', voter: 'voters-address' })
  * ```
  *
  * Note, Graphql Entity names are lowercased with an 's' suffix when

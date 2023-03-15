@@ -170,7 +170,7 @@ export class GqlEntityController {
 
   /**
    * Creates store for each of the objects in the schema.
-   * For now, it only creates mysql tables for each of the objects.
+   * For now, it only creates database tables for each of the objects.
    * It also creates a checkpoint table to track checkpoints visited.
    *
    * For example, given an schema like:
