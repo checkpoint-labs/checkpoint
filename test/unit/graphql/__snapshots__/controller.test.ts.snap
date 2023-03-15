@@ -7,35 +7,13 @@ exports[` 2`] = `"'id' field for type Vote is not a scalar type."`;
 exports[` 3`] = `"'id' field for type Participant is not a scalar type."`;
 
 exports[`GqlEntityController createEntityStores should work 1`] = `
-[MockFunction] {
-  "calls": Array [
-    Array [
-      "
-
-DROP TABLE IF EXISTS votes;
-CREATE TABLE votes (
-  \`id\` INT(128) NOT NULL,
-  \`name\` VARCHAR(128),
-  \`authenticators\` JSON,
-  \`big_number\` BIGINT,
-  \`decimal\` DECIMAL(10, 2),
-  \`big_decimal\` DECIMAL(20, 8),
-  PRIMARY KEY (id) ,
-  INDEX \`id\` (\`id\`),
-  INDEX \`name\` (\`name\`),
-  INDEX \`big_number\` (\`big_number\`),
-  INDEX \`decimal\` (\`decimal\`),
-  INDEX \`big_decimal\` (\`big_decimal\`)
-);",
-    ],
-  ],
-  "results": Array [
-    Object {
-      "type": "return",
-      "value": undefined,
-    },
-  ],
-}
+"drop table if exists \`votes\`;
+create table \`votes\` (\`id\` integer not null, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float);
+create index \`votes_id_index\` on \`votes\` (\`id\`);
+create index \`votes_name_index\` on \`votes\` (\`name\`);
+create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
+create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
+create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 `;
 
 exports[`GqlEntityController generateQueryFields should work 1`] = `

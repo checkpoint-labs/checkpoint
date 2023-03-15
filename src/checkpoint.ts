@@ -5,6 +5,7 @@ import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 
 import { createLogger, Logger, LogLevel } from './utils/logger';
+import knex from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import {
   ContractSourceConfig,
@@ -142,7 +143,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
-    await this.entityController.createEntityStores(this.mysql);
+    await this.entityController.createEntityStores(knex);
   }
 
   public addSource(source: ContractSourceConfig) {

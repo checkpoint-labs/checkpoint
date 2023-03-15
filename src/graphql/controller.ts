@@ -21,8 +21,9 @@ import {
   isListType,
   Source
 } from 'graphql';
+import { Knex } from 'knex';
 import pluralize from 'pluralize';
-import { AsyncMySqlPool } from '../mysql';
+import { KnexType } from '../knex';
 import {
   generateQueryForEntity,
   multiEntityQueryName,
@@ -193,41 +194,39 @@ export class GqlEntityController {
    * ```
    *
    */
-  public async createEntityStores(mysql: AsyncMySqlPool): Promise<void> {
+  public createEntityStores(knex: Knex): Knex.SchemaBuilder {
+    let builder = knex.schema;
+
     if (this.schemaObjects.length === 0) {
-      return;
+      return builder;
     }
 
-    let sql = '';
-    this.schemaObjects.forEach(type => {
+    this.schemaObjects.map(type => {
       const tableName = pluralize(pluralize(type.name.toLowerCase()));
 
-      sql += `\n\nDROP TABLE IF EXISTS ${tableName};`;
-      sql += `\nCREATE TABLE ${tableName} (`;
-      let sqlIndexes = ``;
+      builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
+        this.getTypeFields(type).forEach(field => {
+          const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
+          if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
+          const sqlType = this.getSqlType(field.type);
 
-      this.getTypeFields(type).forEach(field => {
-        const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-        if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
+          let column =
+            'options' in sqlType
+              ? t[sqlType.name](field.name, ...sqlType.options)
+              : t[sqlType.name](field.name);
 
-        const sqlType = this.getSqlType(field.type);
+          if (field.type instanceof GraphQLNonNull) {
+            column = column.notNullable();
+          }
 
-        sql += `\n  \`${field.name}\` ${sqlType}`;
-        if (field.type instanceof GraphQLNonNull) {
-          sql += ' NOT NULL,';
-        } else {
-          sql += ',';
-        }
-
-        if (!['TEXT', 'JSON'].includes(sqlType)) {
-          sqlIndexes += `,\n  INDEX \`${field.name}\` (\`${field.name}\`)`;
-        }
+          if (!['text', 'json'].includes(sqlType.name)) {
+            column.index();
+          }
+        });
       });
-      sql += `\n  PRIMARY KEY (id) ${sqlIndexes}\n);\n`;
     });
 
-    // TODO(perfectmak): wrap this in a transaction
-    return mysql.queryAsync(sql.trimEnd());
+    return builder;
   }
 
   /**
@@ -411,23 +410,23 @@ export class GqlEntityController {
   }
 
   /**
-   * Return a mysql column type for the graphql type.
+   * Return a knex column type and options for the graphql type.
    *
-   * It throws if the type is not a recognized scalar type.
+   * It throws if the type is not a recognized type.
    */
-  private getSqlType(type: GraphQLOutputType): string {
+  private getSqlType(type: GraphQLOutputType): KnexType {
     if (type instanceof GraphQLNonNull) {
       type = type.ofType;
     }
 
     switch (type) {
       case GraphQLInt:
-        return 'INT(128)';
+        return { name: 'integer' };
       case GraphQLFloat:
-        return 'FLOAT(23)';
+        return { name: 'float', options: [23] };
       case GraphQLString:
       case GraphQLID:
-        return 'VARCHAR(128)';
+        return { name: 'string', options: [128] };
     }
 
     if (type instanceof GraphQLObjectType) {
@@ -440,30 +439,30 @@ export class GqlEntityController {
         idField.type.ofType instanceof GraphQLScalarType &&
         ['String', 'ID'].includes(idField.type.ofType.name)
       ) {
-        return 'VARCHAR(128)';
+        return { name: 'string', options: [128] };
       }
     }
 
     // check for TEXT scalar type
     if (type instanceof GraphQLScalarType && type.name === 'Text') {
-      return 'TEXT';
+      return { name: 'text' };
     }
 
     if (type instanceof GraphQLScalarType && type.name === 'BigInt') {
-      return 'BIGINT';
+      return { name: 'bigint' };
     }
 
     if (type instanceof GraphQLScalarType && type.name === 'Boolean') {
-      return 'BOOLEAN';
+      return { name: 'boolean' };
     }
 
     if (type instanceof GraphQLScalarType && this.decimalTypes[type.name]) {
       const decimalType = this.decimalTypes[type.name];
-      return `DECIMAL(${decimalType.p}, ${decimalType.d})`;
+      return { name: 'decimal', options: [decimalType.p, decimalType.d] };
     }
 
     if (type instanceof GraphQLList) {
-      return 'JSON';
+      return { name: 'json' };
     }
 
     throw new Error(`sql type for ${type} not support`);
