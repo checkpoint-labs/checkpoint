@@ -140,7 +140,7 @@ function formatItem(item: Record<string, any>, jsonFields: GraphQLField<any, any
   const formatted = { ...item };
 
   jsonFields.forEach(field => {
-    if (formatted[field.name]) {
+    if (typeof formatted[field.name] === 'string') {
       formatted[field.name] = JSON.parse(formatted[field.name]);
     }
   });
