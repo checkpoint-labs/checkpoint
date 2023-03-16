@@ -145,6 +145,19 @@ export default class Checkpoint {
     await this.entityController.createEntityStores(this.mysql);
   }
 
+  /**
+   * Resets Checkpoint's internal tables (including checkpoints).
+   *
+   * Calling this function will cause next run of checkpoint to start syncing
+   * from the start, block-by-block, until new checkpoints are found.
+   *
+   */
+  public async resetMetadata() {
+    this.log.debug('reset metadata');
+
+    await this.store.resetStore();
+  }
+
   public addSource(source: ContractSourceConfig) {
     if (!this.config.sources) this.config.sources = [];
 
