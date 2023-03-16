@@ -18,6 +18,10 @@ describe('CheckpointsStore', () => {
 
   const store = new CheckpointsStore(mockKnex, logger);
 
+  afterAll(async () => {
+    await mockKnex.destroy();
+  });
+
   describe('createStore', () => {
     it('should execute correct query', async () => {
       const { builder } = await store.createStore();

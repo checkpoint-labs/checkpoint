@@ -43,15 +43,19 @@ type Vote {
   });
 
   describe('createEntityStores', () => {
-    it('should work', async () => {
-      const mockKnex = knex({
-        client: 'sqlite3',
-        connection: {
-          filename: ':memory:'
-        },
-        useNullAsDefault: true
-      });
+    const mockKnex = knex({
+      client: 'sqlite3',
+      connection: {
+        filename: ':memory:'
+      },
+      useNullAsDefault: true
+    });
 
+    afterAll(async () => {
+      await mockKnex.destroy();
+    });
+
+    it('should work', async () => {
       const controller = new GqlEntityController(`
 scalar BigInt
 scalar Decimal
