@@ -84,7 +84,8 @@ export default class Checkpoint {
   public getBaseContext() {
     return {
       log: this.log.child({ component: 'resolver' }),
-      knex: this.knex
+      knex: this.knex,
+      mysql: this.mysql
     };
   }
 
