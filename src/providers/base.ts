@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import type { Logger } from '../utils/logger';
 import type Checkpoint from '../checkpoint';
+import type { AsyncMySqlPool } from '../mysql';
 import type { CheckpointConfig, CheckpointWriters } from '../types';
 
 type Instance = {
@@ -11,6 +12,7 @@ type Instance = {
   getWriterParams(): {
     instance: Checkpoint;
     knex: Knex;
+    mysql: AsyncMySqlPool;
   };
 };
 

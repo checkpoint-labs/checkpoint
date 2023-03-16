@@ -7,6 +7,7 @@ import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers'
 
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { createKnex } from './knex';
+import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import {
   ContractSourceConfig,
   CheckpointConfig,
@@ -29,7 +30,9 @@ export default class Checkpoint {
   private readonly log: Logger;
   private readonly networkProvider: BaseProvider;
 
+  private dbConnection: string;
   private knex: Knex;
+  private mysqlPool?: AsyncMySqlPool;
   private checkpointsStore?: CheckpointsStore;
   private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
@@ -75,6 +78,7 @@ export default class Checkpoint {
     }
 
     this.knex = createKnex(dbConnection);
+    this.dbConnection = dbConnection;
   }
 
   public getBaseContext() {
@@ -209,10 +213,11 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
-  public getWriterParams(): { instance: Checkpoint; knex: Knex } {
+  public getWriterParams(): { instance: Checkpoint; knex: Knex; mysql: AsyncMySqlPool } {
     return {
       instance: this,
-      knex: this.knex
+      knex: this.knex,
+      mysql: this.mysql
     };
   }
 
@@ -291,6 +296,32 @@ export default class Checkpoint {
     }
 
     return (this.checkpointsStore = new CheckpointsStore(this.knex, this.log));
+  }
+
+  /**
+   * returns AsyncMySqlPool if mysql client is used, otherwise returns Proxy that
+   * will notify user when used that mysql is not available with other clients
+   */
+  private get mysql(): AsyncMySqlPool {
+    if (this.mysqlPool) {
+      return this.mysqlPool;
+    }
+
+    if (this.knex.client.config.client === 'mysql') {
+      this.mysqlPool = createMySqlPool(this.dbConnection);
+      return this.mysqlPool;
+    }
+
+    return new Proxy(
+      {},
+      {
+        get() {
+          throw new Error(
+            'mysql is only accessible when using MySQL database. When using different database use knex instead.'
+          );
+        }
+      }
+    ) as AsyncMySqlPool;
   }
 
   private extendSchema(schema: string): string {
