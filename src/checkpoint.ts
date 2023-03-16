@@ -242,7 +242,11 @@ export default class Checkpoint {
       if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
         try {
           await this.networkProvider.processPool(blockNum);
-        } catch (err) {}
+        } catch (err) {
+          this.log.error({ blockNumber: blockNum, err }, 'error occured during pool processing');
+        }
+      } else {
+        this.log.error({ blockNumber: blockNum, err }, 'error occured during block processing');
       }
 
       await Promise.delay(REFRESH_INTERVAL);
