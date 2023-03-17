@@ -17,8 +17,6 @@
   "prettier": "@snapshot-labs/prettier-config",
   "dependencies": {
     "@graphql-tools/schema": "^8.5.1",
-    "@types/mysql": "^2.15.21",
-    "@types/pg": "^8.6.6",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
     "dataloader": "^2.1.0",
@@ -40,7 +38,9 @@
     "@snapshot-labs/prettier-config": "^0.1.0-beta.7",
     "@types/bn.js": "^5.1.0",
     "@types/jest": "^27.4.1",
+    "@types/mysql": "^2.15.21",
     "@types/node": "^18.11.6",
+    "@types/pg": "^8.6.6",
     "dotenv": "^16.0.1",
     "eslint": "^8.28.0",
     "jest": "^27.5.1",
