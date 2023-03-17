@@ -76,7 +76,7 @@ export interface CheckpointConfig {
 
 /**
  * Callback function invoked by checkpoint when a contract event
- * is encountered. A writer function should use the `knex`
+ * is encountered. A writer function should use the `mysql`
  * object to write to the database entities based on the require logic.
  *
  * For example, if a graphql Entity is defined in the schema:
@@ -90,7 +90,10 @@ export interface CheckpointConfig {
  *
  * Then you can insert into the entity into the database like:
  * ```typescript
- * await knex.table('votes').insert({ id: 'voteId', voter: 'voters-address' })
+ * await args.mysql.queryAsync('INSERT INTO votes VALUES(?, ?);', ['voteId', 'voters-address']);
+ *
+ * // or using pg
+ * await args.pg.query('INSERT INTO votes VALUES($1, $2);', ['voteId', 'voters-address']);
  * ```
  *
  * Note, Graphql Entity names are lowercased with an 's' suffix when
