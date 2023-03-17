@@ -86,6 +86,23 @@ export class CheckpointsStore {
     this.log.debug('checkpoints tables created');
   }
 
+  /**
+   * Truncates core database tables.
+   *
+   * Calling it will cause all checkpoints to be deleted and will force
+   * syncing to start from start.
+   *
+   */
+  public async resetStore(): Promise<void> {
+    this.log.debug('truncating checkpoints tables');
+
+    let sql = `TRUNCATE TABLE ${Table.Checkpoints};`;
+    sql += `TRUNCATE TABLE ${Table.Metadata};`;
+
+    await this.mysql.queryAsync(sql);
+    this.log.debug('checkpoints tables truncated');
+  }
+
   public async getMetadata(id: string): Promise<string | null> {
     const value = await this.mysql.queryAsync(
       `SELECT ${Fields.Metadata.Value} FROM ${Table.Metadata} WHERE ${Fields.Metadata.Id} = ? LIMIT 1`,
