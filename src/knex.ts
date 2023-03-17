@@ -30,22 +30,8 @@ const EXTRA_OPTIONS = {
   }
 };
 
-export function createKnexConfig(connection: string): Knex.Config {
-  if (
-    connection.endsWith('.sqlite') ||
-    connection.endsWith('.sqlite3') ||
-    connection.endsWith('.db')
-  ) {
-    return {
-      client: 'sqlite3',
-      connection: {
-        filename: connection
-      },
-      useNullAsDefault: true
-    };
-  }
-
-  const connectionConfig = new ConnectionString(connection);
+export function getConnectionData(connectionString: string) {
+  const connectionConfig = new ConnectionString(connectionString);
   if (!connectionConfig.protocol || !connectionConfig.hosts || !connectionConfig.path) {
     throw new Error('invalid connection string provided');
   }
@@ -73,6 +59,10 @@ export function createKnexConfig(connection: string): Knex.Config {
       ...EXTRA_OPTIONS[client]
     }
   };
+}
+
+export function createKnexConfig(connectionString: string): Knex.Config {
+  return getConnectionData(connectionString);
 }
 
 export function createKnex(config: string | Knex.Config) {

@@ -1,6 +1,7 @@
 import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import { Knex } from 'knex';
+import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
@@ -8,6 +9,7 @@ import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers'
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
+import { createPgPool } from './pg';
 import {
   ContractSourceConfig,
   CheckpointConfig,
@@ -33,6 +35,7 @@ export default class Checkpoint {
   private dbConnection: string;
   private knex: Knex;
   private mysqlPool?: AsyncMySqlPool;
+  private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
@@ -85,7 +88,8 @@ export default class Checkpoint {
     return {
       log: this.log.child({ component: 'resolver' }),
       knex: this.knex,
-      mysql: this.mysql
+      mysql: this.mysql,
+      pg: this.pg
     };
   }
 
@@ -214,11 +218,16 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
-  public getWriterParams(): { instance: Checkpoint; knex: Knex; mysql: AsyncMySqlPool } {
+  public async getWriterParams(): Promise<{
+    instance: Checkpoint;
+    knex: Knex;
+    mysql: AsyncMySqlPool;
+    pg: PgPool;
+  }> {
     return {
       instance: this,
-      knex: this.knex,
-      mysql: this.mysql
+      mysql: this.mysql,
+      pg: this.pg
     };
   }
 
@@ -317,12 +326,34 @@ export default class Checkpoint {
       {},
       {
         get() {
-          throw new Error(
-            'mysql is only accessible when using MySQL database. When using different database use knex instead.'
-          );
+          throw new Error('mysql is only accessible when using MySQL database.');
         }
       }
     ) as AsyncMySqlPool;
+  }
+
+  /**
+   * returns pg's Pool if pg client is used, otherwise returns Proxy that
+   * will notify user when used that mysql is not available with other clients
+   */
+  private get pg(): PgPool {
+    if (this.pgPool) {
+      return this.pgPool;
+    }
+
+    if (this.knex.client.config.client === 'pg') {
+      this.pgPool = createPgPool(this.dbConnection);
+      return this.pgPool;
+    }
+
+    return new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('pg is only accessible when using PostgreSQL database.');
+        }
+      }
+    ) as PgPool;
   }
 
   private extendSchema(schema: string): string {

@@ -18,6 +18,7 @@
   "dependencies": {
     "@graphql-tools/schema": "^8.5.1",
     "@types/mysql": "^2.15.21",
+    "@types/pg": "^8.6.6",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
     "dataloader": "^2.1.0",
@@ -28,6 +29,7 @@
     "json-to-graphql-query": "^2.2.4",
     "knex": "^2.4.2",
     "mysql": "^2.18.1",
+    "pg": "^8.10.0",
     "pino": "^8.3.1",
     "pino-pretty": "^8.1.0",
     "pluralize": "^8.0.0",
@@ -43,7 +45,6 @@
     "eslint": "^8.28.0",
     "jest": "^27.5.1",
     "jest-mock-extended": "^2.0.7",
-    "pg": "^8.10.0",
     "prettier": "^2.7.1",
     "sqlite3": "^5.1.6",
     "ts-jest": "^27.1.4",

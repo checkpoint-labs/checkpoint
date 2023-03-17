@@ -12,6 +12,7 @@ import {
   simplifyParsedResolveInfoFragmentWithType
 } from 'graphql-parse-resolve-info';
 import { Knex } from 'knex';
+import { Pool as PgPool } from 'pg';
 import { AsyncMySqlPool } from '../mysql';
 import { getNonNullType } from '../utils/graphql';
 import { getTableName } from '../utils/database';
@@ -22,6 +23,7 @@ export type ResolverContextInput = {
   log: Logger;
   knex: Knex;
   mysql: AsyncMySqlPool;
+  pg: PgPool;
 };
 
 export type ResolverContext = ResolverContextInput & {
