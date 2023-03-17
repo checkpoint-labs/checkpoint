@@ -20,7 +20,8 @@ export type KnexType =
 
 const PROTOCOLS = {
   mysql: 'mysql',
-  postgres: 'pg'
+  postgres: 'pg',
+  postgresql: 'pg'
 };
 
 const EXTRA_OPTIONS = {
