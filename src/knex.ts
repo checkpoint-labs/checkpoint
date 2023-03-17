@@ -1,3 +1,4 @@
+import fs from 'fs';
 import knex, { Knex } from 'knex';
 import { ConnectionString } from 'connection-string';
 
@@ -42,6 +43,21 @@ export function getConnectionData(connectionString: string) {
     throw new Error(`Supplied protocol ${connectionConfig.protocol} is not supported`);
   }
 
+  const sslConfig: { rejectUnauthorized?: boolean; sslmode?: string; ca?: string } = {};
+  if (
+    connectionConfig.params?.sslaccept === 'strict' ||
+    connectionConfig.params?.ssl === 'rejectUnauthorized'
+  ) {
+    sslConfig.rejectUnauthorized = true;
+  }
+  if (connectionConfig.params?.sslmode) {
+    sslConfig.sslmode = connectionConfig.params.sslmode;
+  }
+
+  if (process.env.CA_CERT) {
+    sslConfig.ca = fs.readFileSync(process.env.CA_CERT).toString();
+  }
+
   return {
     client,
     connection: {
@@ -50,13 +66,7 @@ export function getConnectionData(connectionString: string) {
       password: connectionConfig.password,
       host: connectionConfig.hosts[0].name,
       port: connectionConfig.hosts[0].port,
-      ssl:
-        connectionConfig.params?.sslaccept === 'strict' ||
-        connectionConfig.params?.ssl === 'rejectUnauthorized'
-          ? {
-              rejectUnauthorized: true
-            }
-          : undefined,
+      ssl: sslConfig,
       ...EXTRA_OPTIONS[client]
     }
   };
