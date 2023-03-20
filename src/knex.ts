@@ -55,7 +55,9 @@ export function getConnectionData(connectionString: string) {
   }
 
   if (process.env.CA_CERT) {
-    sslConfig.ca = fs.readFileSync(process.env.CA_CERT).toString();
+    sslConfig.ca = process.env.CA_CERT;
+  } else if (process.env.CA_CERT_FILE) {
+    sslConfig.ca = fs.readFileSync(process.env.CA_CERT_FILE).toString();
   }
 
   return {
