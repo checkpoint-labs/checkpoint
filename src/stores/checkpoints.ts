@@ -106,10 +106,17 @@ export class CheckpointsStore {
   public async resetStore(): Promise<void> {
     this.log.debug('truncating checkpoints tables');
 
-    let sql = `TRUNCATE TABLE ${Table.Checkpoints};`;
-    sql += `TRUNCATE TABLE ${Table.Metadata};`;
+    const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
+    const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
 
-    await this.mysql.queryAsync(sql);
+    if (hasCheckpointsTable) {
+      await this.knex(Table.Checkpoints).truncate();
+    }
+
+    if (hasMetadataTable) {
+      await this.knex(Table.Checkpoints).truncate();
+    }
+
     this.log.debug('checkpoints tables truncated');
   }
 
