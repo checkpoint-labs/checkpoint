@@ -1,3 +1,4 @@
+import { Pool as PgPool } from 'pg';
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 import type { RPC } from 'starknet';
@@ -24,7 +25,7 @@ export interface CheckpointOptions {
   // optionally format logs to pretty output.
   // Not recommended for production.
   prettifyLogs?: boolean;
-  // Optional database connection string. For now only accepts mysql database
+  // Optional database connection string. For now only accepts PostgreSQL and MySQL/MariaDB
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
   dbConnection?: string;
@@ -90,6 +91,9 @@ export interface CheckpointConfig {
  * Then you can insert into the entity into the database like:
  * ```typescript
  * await args.mysql.queryAsync('INSERT INTO votes VALUES(?, ?);', ['voteId', 'voters-address']);
+ *
+ * // or using pg
+ * await args.pg.query('INSERT INTO votes VALUES($1, $2);', ['voteId', 'voters-address']);
  * ```
  *
  * Note, Graphql Entity names are lowercased with an 's' suffix when
@@ -105,6 +109,7 @@ export type CheckpointWriter = (args: {
   eventIndex?: number;
   source?: ContractSourceConfig;
   mysql: AsyncMySqlPool;
+  pg: PgPool;
   instance: Checkpoint;
 }) => Promise<void>;
 

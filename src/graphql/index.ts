@@ -25,10 +25,14 @@ export const createGetLoader = (context: ResolverContextInput) => {
 
     if (!loaders[key]) {
       loaders[key] = new DataLoader(async ids => {
-        const query = `SELECT * FROM ${getTableName(name)} WHERE ${field} in (?)`;
-        context.log.debug({ sql: query, ids }, 'executing batched query');
+        const query = context.knex
+          .select('*')
+          .from(getTableName(name))
+          .whereIn(field, ids as string[]);
 
-        const results = await context.mysql.queryAsync(query, [ids]);
+        context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
+
+        const results = await query;
         const resultsMap = results.reduce((acc, result) => {
           if (!acc[result[field]]) acc[result[field]] = [];
 

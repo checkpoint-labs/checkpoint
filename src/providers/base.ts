@@ -1,3 +1,4 @@
+import { Pool as PgPool } from 'pg';
 import type { Logger } from '../utils/logger';
 import type Checkpoint from '../checkpoint';
 import type { AsyncMySqlPool } from '../mysql';
@@ -8,10 +9,11 @@ type Instance = {
   config: CheckpointConfig;
   setLastIndexedBlock(blockNum: number);
   insertCheckpoints(checkpoints: { blockNumber: number; contractAddress: string }[]);
-  getWriterParams(): {
+  getWriterParams(): Promise<{
     instance: Checkpoint;
     mysql: AsyncMySqlPool;
-  };
+    pg: PgPool;
+  }>;
 };
 
 export class BlockNotFoundError extends Error {

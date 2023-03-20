@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { AsyncMySqlPool } from '../mysql';
+import { Knex } from 'knex';
 import { Logger } from '../utils/logger';
 
 const Table = {
@@ -52,12 +52,12 @@ export const getCheckpointId = (contract: string, block: number): string => {
  * Checkpoints store is a data store class for managing
  * checkpoints data schema and records.
  *
- * It interacts with an underlying mysql database.
+ * It interacts with an underlying database.
  */
 export class CheckpointsStore {
   private readonly log: Logger;
 
-  constructor(private readonly mysql: AsyncMySqlPool, log: Logger) {
+  constructor(private readonly knex: Knex, log: Logger) {
     this.log = log.child({ component: 'checkpoints_store' });
   }
 
@@ -66,24 +66,34 @@ export class CheckpointsStore {
    *
    * This only creates the tables if they don't exist.
    */
-  public async createStore(): Promise<void> {
+  public async createStore(): Promise<{ builder: Knex.SchemaBuilder }> {
     this.log.debug('creating checkpoints tables...');
 
-    let sql = `CREATE TABLE IF NOT EXISTS ${Table.Checkpoints} (
-      ${Fields.Checkpoints.Id} VARCHAR(${CheckpointIdSize}) NOT NULL,
-      ${Fields.Checkpoints.BlockNumber} BIGINT NOT NULL,
-      ${Fields.Checkpoints.ContractAddress} VARCHAR(66) NOT NULL,
-      PRIMARY KEY (${Fields.Checkpoints.Id})
-    );`;
+    const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
+    const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
 
-    sql += `\nCREATE TABLE IF NOT EXISTS ${Table.Metadata} (
-      ${Fields.Metadata.Id} VARCHAR(20) NOT NULL,
-      ${Fields.Metadata.Value} VARCHAR(128) NOT NULL,
-      PRIMARY KEY (${Fields.Metadata.Id})
-    );`;
+    let builder = this.knex.schema;
 
-    await this.mysql.queryAsync(sql);
+    if (!hasCheckpointsTable) {
+      builder = builder.createTable(Table.Checkpoints, t => {
+        t.string(Fields.Checkpoints.Id, CheckpointIdSize).primary();
+        t.bigint(Fields.Checkpoints.BlockNumber).notNullable();
+        t.string(Fields.Checkpoints.ContractAddress, 66).notNullable();
+      });
+    }
+
+    if (!hasMetadataTable) {
+      builder = builder.dropTableIfExists(Table.Metadata).createTable(Table.Metadata, t => {
+        t.string(Fields.Metadata.Id, 20).primary();
+        t.string(Fields.Metadata.Value, 128).notNullable();
+      });
+    }
+
+    await builder;
+
     this.log.debug('checkpoints tables created');
+
+    return { builder };
   }
 
   /**
@@ -104,10 +114,11 @@ export class CheckpointsStore {
   }
 
   public async getMetadata(id: string): Promise<string | null> {
-    const value = await this.mysql.queryAsync(
-      `SELECT ${Fields.Metadata.Value} FROM ${Table.Metadata} WHERE ${Fields.Metadata.Id} = ? LIMIT 1`,
-      [id]
-    );
+    const value = await this.knex
+      .select(Fields.Metadata.Value)
+      .from(Table.Metadata)
+      .where(Fields.Metadata.Id, id)
+      .limit(1);
 
     if (value.length == 0) {
       return null;
@@ -126,22 +137,36 @@ export class CheckpointsStore {
   }
 
   public async setMetadata(id: string, value: ToString): Promise<void> {
-    await this.mysql.queryAsync(`REPLACE INTO ${Table.Metadata} VALUES (?,?)`, [
-      id,
-      value.toString()
-    ]);
+    await this.knex
+      .table(Table.Metadata)
+      .insert({
+        [Fields.Metadata.Id]: id,
+        [Fields.Metadata.Value]: value
+      })
+      .onConflict(Fields.Metadata.Id)
+      .merge();
   }
 
   public async insertCheckpoints(checkpoints: CheckpointRecord[]): Promise<void> {
     if (checkpoints.length === 0) {
       return;
     }
-    await this.mysql.queryAsync(`INSERT IGNORE INTO ${Table.Checkpoints} VALUES ?`, [
-      checkpoints.map(checkpoint => {
-        const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
-        return [id, checkpoint.blockNumber, checkpoint.contractAddress];
-      })
-    ]);
+
+    await this.knex
+      .table(Table.Checkpoints)
+      .insert(
+        checkpoints.map(checkpoint => {
+          const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
+
+          return {
+            [Fields.Checkpoints.Id]: id,
+            [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
+            [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
+          };
+        })
+      )
+      .onConflict(Fields.Checkpoints.Id)
+      .ignore();
   }
 
   /**
@@ -157,14 +182,12 @@ export class CheckpointsStore {
     contracts: string[],
     limit = 15
   ): Promise<number[]> {
-    const result = await this.mysql.queryAsync(
-      `SELECT ${Fields.Checkpoints.BlockNumber} FROM ${Table.Checkpoints} 
-      WHERE ${Fields.Checkpoints.BlockNumber} >= ?
-        AND ${Fields.Checkpoints.ContractAddress} IN (?)
-      ORDER BY ${Fields.Checkpoints.BlockNumber} ASC
-      LIMIT ?`,
-      [block, contracts, limit]
-    );
+    const result = await this.knex
+      .select(Fields.Checkpoints.BlockNumber)
+      .from(Table.Checkpoints)
+      .where(Fields.Checkpoints.BlockNumber, '>=', block)
+      .whereIn(Fields.Checkpoints.ContractAddress, contracts)
+      .limit(limit);
 
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
 

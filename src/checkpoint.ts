@@ -1,11 +1,15 @@
 import Promise from 'bluebird';
 import { addResolversToSchema } from '@graphql-tools/schema';
+import { Knex } from 'knex';
+import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 
 import { createLogger, Logger, LogLevel } from './utils/logger';
+import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
+import { createPgPool } from './pg';
 import {
   ContractSourceConfig,
   CheckpointConfig,
@@ -28,8 +32,10 @@ export default class Checkpoint {
   private readonly log: Logger;
   private readonly networkProvider: BaseProvider;
 
+  private dbConnection: string;
+  private knex: Knex;
   private mysqlPool?: AsyncMySqlPool;
-  private mysqlConnection?: string;
+  private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
@@ -67,13 +73,23 @@ export default class Checkpoint {
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
     this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
 
-    this.mysqlConnection = opts?.dbConnection;
+    const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
+    if (!dbConnection) {
+      throw new Error(
+        'a valid connection string or DATABASE_URL environment variable is required to connect to the database'
+      );
+    }
+
+    this.knex = createKnex(dbConnection);
+    this.dbConnection = dbConnection;
   }
 
   public getBaseContext() {
     return {
       log: this.log.child({ component: 'resolver' }),
-      mysql: this.mysql
+      knex: this.knex,
+      mysql: this.mysql,
+      pg: this.pg
     };
   }
 
@@ -142,7 +158,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
-    await this.entityController.createEntityStores(this.mysql);
+    await this.entityController.createEntityStores(this.knex);
   }
 
   /**
@@ -215,10 +231,16 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
-  public getWriterParams(): { instance: Checkpoint; mysql: AsyncMySqlPool } {
+  public async getWriterParams(): Promise<{
+    instance: Checkpoint;
+    knex: Knex;
+    mysql: AsyncMySqlPool;
+    pg: PgPool;
+  }> {
     return {
       instance: this,
-      mysql: this.mysql
+      mysql: this.mysql,
+      pg: this.pg
     };
   }
 
@@ -300,16 +322,55 @@ export default class Checkpoint {
       return this.checkpointsStore;
     }
 
-    return (this.checkpointsStore = new CheckpointsStore(this.mysql, this.log));
+    return (this.checkpointsStore = new CheckpointsStore(this.knex, this.log));
   }
 
+  /**
+   * returns AsyncMySqlPool if mysql client is used, otherwise returns Proxy that
+   * will notify user when used that mysql is not available with other clients
+   */
   private get mysql(): AsyncMySqlPool {
     if (this.mysqlPool) {
       return this.mysqlPool;
     }
 
-    // lazy initialization of mysql connection
-    return (this.mysqlPool = createMySqlPool(this.mysqlConnection));
+    if (this.knex.client.config.client === 'mysql') {
+      this.mysqlPool = createMySqlPool(this.dbConnection);
+      return this.mysqlPool;
+    }
+
+    return new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('mysql is only accessible when using MySQL database.');
+        }
+      }
+    ) as AsyncMySqlPool;
+  }
+
+  /**
+   * returns pg's Pool if pg client is used, otherwise returns Proxy that
+   * will notify user when used that mysql is not available with other clients
+   */
+  private get pg(): PgPool {
+    if (this.pgPool) {
+      return this.pgPool;
+    }
+
+    if (this.knex.client.config.client === 'pg') {
+      this.pgPool = createPgPool(this.dbConnection);
+      return this.pgPool;
+    }
+
+    return new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('pg is only accessible when using PostgreSQL database.');
+        }
+      }
+    ) as PgPool;
   }
 
   private extendSchema(schema: string): string {

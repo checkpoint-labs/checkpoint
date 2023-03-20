@@ -1,7 +1,6 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
-import { mock } from 'jest-mock-extended';
+import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
-import { AsyncMySqlPool } from '../../../src/mysql';
 
 describe('GqlEntityController', () => {
   describe('generateQueryFields', () => {
@@ -44,8 +43,19 @@ type Vote {
   });
 
   describe('createEntityStores', () => {
+    const mockKnex = knex({
+      client: 'sqlite3',
+      connection: {
+        filename: ':memory:'
+      },
+      useNullAsDefault: true
+    });
+
+    afterAll(async () => {
+      await mockKnex.destroy();
+    });
+
     it('should work', async () => {
-      const mockMysql = mock<AsyncMySqlPool>();
       const controller = new GqlEntityController(`
 scalar BigInt
 scalar Decimal
@@ -60,9 +70,9 @@ type Vote {
   big_decimal: BigDecimal
 }
   `);
-      await controller.createEntityStores(mockMysql);
+      const { builder } = await controller.createEntityStores(mockKnex);
 
-      expect(mockMysql.queryAsync).toMatchSnapshot();
+      expect(builder.toString()).toMatchSnapshot();
     });
   });
 

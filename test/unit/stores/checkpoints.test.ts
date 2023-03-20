@@ -1,31 +1,37 @@
-import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
-import { AsyncMySqlPool } from '../../../src';
-import { CheckpointsStore, getCheckpointId } from '../../../src/stores/checkpoints';
+import knex from 'knex';
+import { mockDeep } from 'jest-mock-extended';
+import { CheckpointsStore } from '../../../src/stores/checkpoints';
 import { Logger } from '../../../src/utils/logger';
 
 describe('CheckpointsStore', () => {
-  let store: CheckpointsStore;
-  let mockMysql: AsyncMySqlPool & DeepMockProxy<AsyncMySqlPool>;
-  let logger: Logger & DeepMockProxy<Logger>;
+  const mockKnex = knex({
+    client: 'sqlite3',
+    connection: {
+      filename: ':memory:'
+    },
+    useNullAsDefault: true
+  });
 
-  beforeEach(() => {
-    mockMysql = mockDeep<AsyncMySqlPool>();
-    logger = mockDeep<Logger>({
-      child: () => mockDeep()
-    });
-    store = new CheckpointsStore(mockMysql, logger);
+  const logger = mockDeep<Logger>({
+    child: () => mockDeep()
+  });
+
+  const store = new CheckpointsStore(mockKnex, logger);
+
+  afterAll(async () => {
+    await mockKnex.destroy();
   });
 
   describe('createStore', () => {
     it('should execute correct query', async () => {
-      await store.createStore();
+      const { builder } = await store.createStore();
 
-      expect(mockMysql.queryAsync.mock.calls).toMatchSnapshot();
+      expect(builder.toString()).toMatchSnapshot();
     });
   });
 
   describe('insertCheckpoints', () => {
-    it('should should execute correct query', async () => {
+    it('should insert checkpoints', async () => {
       const checkpoints = [
         {
           contractAddress: '0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3',
@@ -36,17 +42,11 @@ describe('CheckpointsStore', () => {
           blockNumber: 123222
         }
       ];
+
       await store.insertCheckpoints(checkpoints);
 
-      expect(mockMysql.queryAsync.mock.calls).toMatchSnapshot();
-
-      // verify id is properly computed
-      const queryParams = mockMysql.queryAsync.mock.calls[0][1];
-      const firstBlockInput = queryParams[0][0];
-
-      expect(firstBlockInput[0]).toEqual(
-        getCheckpointId(checkpoints[0].contractAddress, checkpoints[0].blockNumber)
-      );
+      const result = await mockKnex.select('*').from('_checkpoints');
+      expect(result).toMatchSnapshot();
     });
   });
 });

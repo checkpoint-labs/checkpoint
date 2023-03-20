@@ -124,7 +124,7 @@ export class StarknetProvider extends BaseProvider {
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
-    const writerParams = this.instance.getWriterParams();
+    const writerParams = await this.instance.getWriterParams();
 
     if (this.instance.config.tx_fn) {
       await this.instance.writer[this.instance.config.tx_fn]({
