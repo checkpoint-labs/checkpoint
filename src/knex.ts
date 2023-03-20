@@ -68,7 +68,7 @@ export function getConnectionData(connectionString: string) {
       password: connectionConfig.password,
       host: connectionConfig.hosts[0].name,
       port: connectionConfig.hosts[0].port,
-      ssl: sslConfig,
+      ssl: Object.keys(sslConfig).length > 0 ? sslConfig : undefined,
       ...EXTRA_OPTIONS[client]
     }
   };
