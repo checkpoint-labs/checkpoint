@@ -205,6 +205,8 @@ export class GqlEntityController {
       const tableName = pluralize(pluralize(type.name.toLowerCase()));
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
+        t.primary(['id']);
+
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
           if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
