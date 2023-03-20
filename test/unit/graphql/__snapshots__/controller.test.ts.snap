@@ -8,7 +8,7 @@ exports[` 3`] = `"'id' field for type Participant is not a scalar type."`;
 
 exports[`GqlEntityController createEntityStores should work 1`] = `
 "drop table if exists \`votes\`;
-create table \`votes\` (\`id\` integer not null, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float);
+create table \`votes\` (\`id\` integer not null, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, primary key (\`id\`));
 create index \`votes_id_index\` on \`votes\` (\`id\`);
 create index \`votes_name_index\` on \`votes\` (\`name\`);
 create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
