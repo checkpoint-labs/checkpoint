@@ -1,6 +1,6 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
 import { BaseProvider, BlockNotFoundError } from '../base';
-import { parseEvent } from './utils';
+import { createResponseValidator, parseEvent } from './utils';
 import type { Abi } from 'starknet';
 import { isFullBlock, isDeployTransaction } from '../../types';
 import type {
@@ -15,6 +15,7 @@ import type {
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
+  private readonly validateResponse = createResponseValidator({ maxRetries: 3 });
   private processedPoolTransactions = new Set();
 
   constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
@@ -38,6 +39,14 @@ export class StarknetProvider extends BaseProvider {
         this.log.error({ blockNumber: blockNum }, 'invalid block');
         throw new Error('invalid block');
       }
+
+      const valid = this.validateResponse(blockEvents);
+      if (!valid) {
+        this.log.error({ blockNumber: blockNum }, 'no events in the block. skipping for now...');
+        throw new Error('invalid block');
+      }
+
+      this.validateResponse(blockEvents);
     } catch (e) {
       if ((e as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');

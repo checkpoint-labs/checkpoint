@@ -280,7 +280,7 @@ export default class Checkpoint {
         } catch (err) {
           this.log.error({ blockNumber: blockNum, err }, 'error occured during pool processing');
         }
-      } else {
+      } else if (!(err instanceof BlockNotFoundError)) {
         this.log.error({ blockNumber: blockNum, err }, 'error occured during block processing');
       }
 

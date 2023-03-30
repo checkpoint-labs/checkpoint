@@ -1,4 +1,5 @@
-import type { Abi } from 'starknet';
+import { Abi } from 'starknet';
+import { EventsMap } from '../../types';
 
 type StructAbi = {
   name: string;
@@ -69,3 +70,27 @@ export const parseEvent = (abi: Abi, name: string, data: string[]): Record<strin
     return output;
   }, {});
 };
+
+/**
+ * If block was fetched from one node and events from another, it's possible
+ * that events will be empty, because node that handled events request
+ * didn't know about the requested block yet. This function creates a validator
+ * that will return false if there are no events in the block.
+ * Once set number of retries is reached, validator will return true.
+ * @param maxRetries - number of retries before giving up
+ */
+export function createResponseValidator({ maxRetries }: { maxRetries: number }) {
+  let retryCounter = 0;
+
+  return (blockEvents: EventsMap): boolean => {
+    const hasEvents = Object.keys(blockEvents).length > 0;
+    const reachedMaxRetries = retryCounter === maxRetries;
+
+    if (hasEvents || reachedMaxRetries) {
+      retryCounter = 0;
+      return true;
+    }
+
+    return false;
+  };
+}
