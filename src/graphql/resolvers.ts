@@ -56,8 +56,12 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
         query = query.where(w[0].slice(0, -4), '<=', w[1]);
       } else if (w[0].endsWith('_not_contains')) {
         query = query.not.whereLike(w[0].slice(0, -13), `%${w[1]}%`);
+      } else if (w[0].endsWith('_not_contains_nocase')) {
+        query = query.not.whereILike(w[0].slice(0, -20), `%${w[1]}%`);
       } else if (w[0].endsWith('_contains')) {
         query = query.whereLike(w[0].slice(0, -9), `%${w[1]}%`);
+      } else if (w[0].endsWith('_contains_nocase')) {
+        query = query.whereILike(w[0].slice(0, -16), `%${w[1]}%`);
       } else if (w[0].endsWith('_not_in')) {
         query = query.not.whereIn(w[0].slice(0, -7), w[1]);
       } else if (w[0].endsWith('_in')) {

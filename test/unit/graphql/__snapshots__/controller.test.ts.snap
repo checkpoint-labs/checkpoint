@@ -49,6 +49,8 @@ input WhereVote {
   id_not_in: [Int]
   name_contains: String
   name_not_contains: String
+  name_contains_nocase: String
+  name_not_contains_nocase: String
   name: String
   name_not: String
   name_in: [String]
