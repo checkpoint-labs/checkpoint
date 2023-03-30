@@ -345,7 +345,10 @@ export class GqlEntityController {
         whereInputConfig.fields[`${field.name}_lte`] = { type: nonNullFieldType };
       }
 
-      if (nonNullFieldType === GraphQLString) {
+      if (
+        nonNullFieldType === GraphQLString ||
+        (nonNullFieldType as GraphQLScalarType).name === 'Text'
+      ) {
         whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
         whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
       }
