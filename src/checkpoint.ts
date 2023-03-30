@@ -20,7 +20,7 @@ import {
 } from './types';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 
-const REFRESH_INTERVAL = 7000;
+const DEFAULT_FETCH_INTERVAL = 7000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -286,7 +286,7 @@ export default class Checkpoint {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
       }
 
-      await Promise.delay(REFRESH_INTERVAL);
+      await Promise.delay(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
       return this.next(blockNum);
     }
   }
