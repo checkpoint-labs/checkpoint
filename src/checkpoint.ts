@@ -138,6 +138,8 @@ export default class Checkpoint {
   public async start() {
     this.log.debug('starting');
 
+    await this.validateStore();
+
     const blockNum = await this.getStartBlockNum();
     return await this.next(blockNum);
   }
@@ -404,6 +406,24 @@ export default class Checkpoint {
           .map(writer => writer.fn)
           .join(', ')}), but they are not defined`
       );
+    }
+  }
+
+  private async validateStore() {
+    const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
+    const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
+    const hasNetworkChanged = storedNetworkIdentifier !== networkIdentifier;
+
+    if (!storedNetworkIdentifier || (hasNetworkChanged && this.opts?.ignoreNetworkChange)) {
+      await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
+    } else if (hasNetworkChanged) {
+      this.log.error(
+        `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
+        You probably should reset the database by calling .reset() and resetMetadata().
+        If you are sure you want to continue, set ignoreNetworkChange to true in Checkpoint options.`
+      );
+
+      throw new Error('network identifier changed');
     }
   }
 }

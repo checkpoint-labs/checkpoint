@@ -19,6 +19,9 @@ export type EventsMap = { [key: string]: Event[] };
 export type ParsedEvent = Record<string, any>;
 
 export interface CheckpointOptions {
+  // Setting to true will ignore network changes. You probably don't want to set it,
+  // and instead perform database reset when switching networks.
+  ignoreNetworkChange?: boolean;
   // Set the log output levels for checkpoint. Defaults to Error.
   // Note, this does not affect the log outputs in writers.
   logLevel?: LogLevel;
