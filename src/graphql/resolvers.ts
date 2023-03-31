@@ -69,7 +69,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   }
 
   if (args.orderBy) {
-    query = query.orderBy(args.orderBy, args.orderDirection.toLowerCase() || 'desc');
+    query = query.orderBy(args.orderBy, args.orderDirection?.toLowerCase() || 'desc');
   }
 
   query = query.limit(args?.first || 1000).offset(args?.skip || 0);
