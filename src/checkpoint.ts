@@ -1,24 +1,24 @@
 import Promise from 'bluebird';
+import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
-
 import { createLogger, Logger, LogLevel } from './utils/logger';
+import { getContractsFromConfig } from './utils/checkpoint';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
+import { register } from './register';
 import {
   ContractSourceConfig,
   CheckpointConfig,
   CheckpointOptions,
   CheckpointWriters
 } from './types';
-import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 
 const REFRESH_INTERVAL = 7000;
 
@@ -82,6 +82,8 @@ export default class Checkpoint {
 
     this.knex = createKnex(dbConnection);
     this.dbConnection = dbConnection;
+
+    register.setKnex(this.knex);
   }
 
   public getBaseContext() {
