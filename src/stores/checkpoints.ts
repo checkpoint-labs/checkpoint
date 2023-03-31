@@ -194,6 +194,7 @@ export class CheckpointsStore {
       .from(Table.Checkpoints)
       .where(Fields.Checkpoints.BlockNumber, '>=', block)
       .whereIn(Fields.Checkpoints.ContractAddress, contracts)
+      .orderBy(Fields.Checkpoints.BlockNumber, 'asc')
       .limit(limit);
 
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
