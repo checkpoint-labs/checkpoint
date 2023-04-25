@@ -280,10 +280,10 @@ export default class Checkpoint {
         try {
           await this.networkProvider.processPool(blockNum);
         } catch (err) {
-          this.log.error({ blockNumber: blockNum, err }, 'error occured during pool processing');
+          this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
         }
       } else {
-        this.log.error({ blockNumber: blockNum, err }, 'error occured during block processing');
+        this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
       }
 
       await Promise.delay(REFRESH_INTERVAL);

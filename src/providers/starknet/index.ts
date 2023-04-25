@@ -59,7 +59,15 @@ export class StarknetProvider extends BaseProvider {
       txs.map(async tx => {
         if (!tx.transaction_hash) return null;
 
-        return this.provider.getTransactionReceipt(tx.transaction_hash);
+        try {
+          return await this.provider.getTransactionReceipt(tx.transaction_hash);
+        } catch (err) {
+          this.log.error(
+            { transactionHash: tx.transaction_hash, err },
+            'getting transaction receipt failed'
+          );
+          return null;
+        }
       })
     );
 
