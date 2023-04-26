@@ -71,6 +71,7 @@ export class StarknetProvider extends BaseProvider {
       })
     );
 
+    const txsWithReceipts = txs.filter((_, index) => receipts[index] !== null);
     const eventsMap = receipts.reduce((acc, receipt) => {
       if (receipt === null) return acc;
 
@@ -78,7 +79,7 @@ export class StarknetProvider extends BaseProvider {
       return acc;
     }, {});
 
-    await this.handlePool(txs, eventsMap, blockNumber);
+    await this.handlePool(txsWithReceipts, eventsMap, blockNumber);
   }
 
   private async handleBlock(block: FullBlock, eventsMap: EventsMap) {
