@@ -59,10 +59,19 @@ export class StarknetProvider extends BaseProvider {
       txs.map(async tx => {
         if (!tx.transaction_hash) return null;
 
-        return this.provider.getTransactionReceipt(tx.transaction_hash);
+        try {
+          return await this.provider.getTransactionReceipt(tx.transaction_hash);
+        } catch (err) {
+          this.log.warn(
+            { transactionHash: tx.transaction_hash, err },
+            'getting transaction receipt failed'
+          );
+          return null;
+        }
       })
     );
 
+    const txsWithReceipts = txs.filter((_, index) => receipts[index] !== null);
     const eventsMap = receipts.reduce((acc, receipt) => {
       if (receipt === null) return acc;
 
@@ -70,7 +79,7 @@ export class StarknetProvider extends BaseProvider {
       return acc;
     }, {});
 
-    await this.handlePool(txs, eventsMap, blockNumber);
+    await this.handlePool(txsWithReceipts, eventsMap, blockNumber);
   }
 
   private async handleBlock(block: FullBlock, eventsMap: EventsMap) {
