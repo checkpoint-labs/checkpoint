@@ -62,7 +62,7 @@ export class StarknetProvider extends BaseProvider {
         try {
           return await this.provider.getTransactionReceipt(tx.transaction_hash);
         } catch (err) {
-          this.log.error(
+          this.log.warn(
             { transactionHash: tx.transaction_hash, err },
             'getting transaction receipt failed'
           );
