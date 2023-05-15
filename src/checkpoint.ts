@@ -249,20 +249,20 @@ export default class Checkpoint {
     };
   }
 
+  private getConfigStartBlock() {
+    if (this.config.start && (this.config.tx_fn || this.config.global_events)) {
+      return this.config.start;
+    }
+
+    return Math.min(...(this.config.sources?.map(source => source.start) || []));
+  }
+
   private async getStartBlockNum() {
-    let start = 0;
-    let lastBlock = await this.store.getMetadataNumber(MetadataId.LastIndexedBlock);
-    lastBlock = lastBlock ?? 0;
+    const start = this.getConfigStartBlock();
+    const lastBlock = (await this.store.getMetadataNumber(MetadataId.LastIndexedBlock)) ?? 0;
 
     const nextBlock = lastBlock + 1;
 
-    if (this.config.tx_fn || this.config.global_events) {
-      if (this.config.start) start = this.config.start;
-    } else {
-      (this.config.sources || []).forEach(source => {
-        start = start === 0 || start > source.start ? source.start : start;
-      });
-    }
     return nextBlock > start ? nextBlock : start;
   }
 
@@ -412,14 +412,18 @@ export default class Checkpoint {
   private async validateStore() {
     const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
+    const storedStartBlock = await this.store.getMetadataNumber(MetadataId.StartBlock);
     const hasNetworkChanged =
       storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
+    const hasStartBlockChanged =
+      storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
 
-    if (hasNetworkChanged && this.opts?.resetOnConfigChange) {
+    if ((hasNetworkChanged || hasStartBlockChanged) && this.opts?.resetOnConfigChange) {
       await this.resetMetadata();
       await this.reset();
 
       await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
+      await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
     } else if (hasNetworkChanged) {
       this.log.error(
         `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
@@ -428,8 +432,18 @@ export default class Checkpoint {
       );
 
       throw new Error('network identifier changed');
+    } else if (hasStartBlockChanged) {
+      this.log.error(
+        `start block changed from ${storedStartBlock} to ${this.getConfigStartBlock()}.
+          You probably should reset the database by calling .reset() and resetMetadata().
+          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
+      );
+
+      throw new Error('start block changed');
     } else if (!storedNetworkIdentifier) {
       await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
+    } else if (!storedStartBlock) {
+      await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
     }
   }
 }
