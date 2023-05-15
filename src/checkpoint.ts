@@ -412,18 +412,24 @@ export default class Checkpoint {
   private async validateStore() {
     const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
-    const hasNetworkChanged = storedNetworkIdentifier !== networkIdentifier;
+    const hasNetworkChanged =
+      storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
 
-    if (!storedNetworkIdentifier || (hasNetworkChanged && this.opts?.ignoreNetworkChange)) {
+    if (hasNetworkChanged && this.opts?.resetOnConfigChange) {
+      await this.resetMetadata();
+      await this.reset();
+
       await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
     } else if (hasNetworkChanged) {
       this.log.error(
         `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
-        You probably should reset the database by calling .reset() and resetMetadata().
-        If you are sure you want to continue, set ignoreNetworkChange to true in Checkpoint options.`
+          You probably should reset the database by calling .reset() and resetMetadata().
+          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
       );
 
       throw new Error('network identifier changed');
+    } else if (!storedNetworkIdentifier) {
+      await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
     }
   }
 }
