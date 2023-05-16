@@ -202,7 +202,7 @@ export class GqlEntityController {
     }
 
     this.schemaObjects.map(type => {
-      const tableName = pluralize(pluralize(type.name.toLowerCase()));
+      const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
         t.primary(['id']);
@@ -260,7 +260,7 @@ export class GqlEntityController {
    * Note: that the returned objects does not include the Query object type if defined.
    *
    */
-  private get schemaObjects(): GraphQLObjectType[] {
+  public get schemaObjects(): GraphQLObjectType[] {
     if (this._schemaObjects) {
       return this._schemaObjects;
     }
@@ -274,7 +274,7 @@ export class GqlEntityController {
     return this._schemaObjects;
   }
 
-  private getTypeFields<Parent, Context>(
+  public getTypeFields<Parent, Context>(
     type: GraphQLObjectType<Parent, Context>
   ): GraphQLField<Parent, Context>[] {
     return Object.values(type.getFields());

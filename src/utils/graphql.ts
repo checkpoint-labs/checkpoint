@@ -9,6 +9,11 @@ import {
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
 
+export const extendSchema = (schema: string): string => {
+  return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
+${schema}`;
+};
+
 /**
  * Returns name of query for fetching single entity record
  *

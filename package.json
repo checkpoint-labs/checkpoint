@@ -2,6 +2,9 @@
   "name": "@snapshot-labs/checkpoint",
   "version": "0.1.0-beta.17",
   "license": "MIT",
+  "bin": {
+    "checkpoint": "dist/src/bin/index.js"
+  },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
