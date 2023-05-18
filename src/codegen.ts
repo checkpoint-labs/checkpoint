@@ -31,8 +31,8 @@ export const getInitialValue = (field: GraphQLField<any, any>) => {
       return '';
   }
 
-  if (field instanceof GraphQLScalarType) {
-    switch (field.name) {
+  if (nonNullType instanceof GraphQLScalarType) {
+    switch (nonNullType.name) {
       case 'BigInt':
         return 0;
       case 'Boolean':
@@ -46,7 +46,7 @@ export const getInitialValue = (field: GraphQLField<any, any>) => {
     }
   }
 
-  if (field instanceof GraphQLList) {
+  if (nonNullType instanceof GraphQLList) {
     return [];
   }
 
@@ -54,7 +54,9 @@ export const getInitialValue = (field: GraphQLField<any, any>) => {
 };
 
 export const getBaseType = (type: GraphQLType) => {
-  switch (type) {
+  const nonNullType = type instanceof GraphQLNonNull ? type.ofType : type;
+
+  switch (nonNullType) {
     case GraphQLInt:
     case GraphQLFloat:
       return 'number';
@@ -63,12 +65,12 @@ export const getBaseType = (type: GraphQLType) => {
       return 'string';
   }
 
-  if (type instanceof GraphQLObjectType) {
+  if (nonNullType instanceof GraphQLObjectType) {
     return 'string';
   }
 
-  if (type instanceof GraphQLScalarType) {
-    switch (type.name) {
+  if (nonNullType instanceof GraphQLScalarType) {
+    switch (nonNullType.name) {
       case 'BigInt':
         return 'bigint';
       case 'Boolean':
@@ -82,9 +84,8 @@ export const getBaseType = (type: GraphQLType) => {
     }
   }
 
-  if (type instanceof GraphQLList) {
-    const nonNullType = type.ofType instanceof GraphQLNonNull ? type.ofType.ofType : type.ofType;
-    return `${getBaseType(nonNullType)}[]`;
+  if (nonNullType instanceof GraphQLList) {
+    return `${getBaseType(nonNullType.ofType)}[]`;
   }
 
   return null;
