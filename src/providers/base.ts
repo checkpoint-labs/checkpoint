@@ -44,7 +44,7 @@ export class BaseProvider {
     }
   }
 
-  processBlock(blockNum: number) {
+  processBlock(blockNum: number): Promise<number> {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
   }
 

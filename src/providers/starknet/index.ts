@@ -51,6 +51,8 @@ export class StarknetProvider extends BaseProvider {
     await this.handleBlock(block, blockEvents);
 
     await this.instance.setLastIndexedBlock(block.block_number);
+
+    return blockNum + 1;
   }
 
   async processPool(blockNumber: number) {
