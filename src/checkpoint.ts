@@ -20,7 +20,7 @@ import {
 } from './types';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 
-const REFRESH_INTERVAL = 7000;
+const REFRESH_INTERVAL = 1000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -272,9 +272,9 @@ export default class Checkpoint {
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
-      await this.networkProvider.processBlock(blockNum);
+      const nextBlock = await this.networkProvider.processBlock(blockNum);
 
-      return this.next(blockNum + 1);
+      return this.next(nextBlock);
     } catch (err) {
       if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
         try {
