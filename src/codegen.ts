@@ -15,80 +15,66 @@ import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
 import { extendSchema } from './utils/graphql';
 
-export const getInitialValue = (field: GraphQLField<any, any>) => {
-  if (!(field.type instanceof GraphQLNonNull)) {
-    return null;
+type TypeInfo = {
+  type: string;
+  initialValue: any;
+};
+
+export const getTypeInfo = (type: GraphQLType): TypeInfo => {
+  if (type instanceof GraphQLNonNull) {
+    throw new Error('Type must raw type');
   }
 
-  const nonNullType = field.type.ofType;
-
-  switch (nonNullType) {
+  switch (type) {
     case GraphQLInt:
     case GraphQLFloat:
-      return 0;
+      return { type: 'number', initialValue: 0 };
     case GraphQLString:
     case GraphQLID:
-      return '';
+      return { type: 'string', initialValue: '' };
   }
 
-  if (nonNullType instanceof GraphQLScalarType) {
-    switch (nonNullType.name) {
+  if (type instanceof GraphQLScalarType) {
+    switch (type.name) {
       case 'BigInt':
-        return 0;
+        return { type: 'bigint', initialValue: 0 };
       case 'Boolean':
-        return false;
+        return { type: 'boolean', initialValue: false };
       case 'Text':
-        return '';
+        return { type: 'string', initialValue: '' };
       default:
         // TODO: handle decimal types - currently decimal types are defined
         // in options so we don't have access from codegen
-        return '0';
+        return { type: 'string', initialValue: '0' };
     }
   }
 
-  if (nonNullType instanceof GraphQLList) {
-    return [];
+  if (type instanceof GraphQLObjectType) {
+    return { type: 'string', initialValue: '' };
   }
 
-  return null;
+  if (type instanceof GraphQLList) {
+    const nonNullNestedType =
+      type.ofType instanceof GraphQLNonNull ? type.ofType.ofType : type.ofType;
+
+    return { type: `${getTypeInfo(nonNullNestedType).type}[]`, initialValue: [] };
+  }
+
+  throw new Error('Unknown type');
+};
+
+export const getInitialValue = (type: GraphQLType) => {
+  if (!(type instanceof GraphQLNonNull)) {
+    return null;
+  }
+
+  return getTypeInfo(type.ofType).initialValue;
 };
 
 export const getBaseType = (type: GraphQLType) => {
   const nonNullType = type instanceof GraphQLNonNull ? type.ofType : type;
 
-  switch (nonNullType) {
-    case GraphQLInt:
-    case GraphQLFloat:
-      return 'number';
-    case GraphQLString:
-    case GraphQLID:
-      return 'string';
-  }
-
-  if (nonNullType instanceof GraphQLObjectType) {
-    return 'string';
-  }
-
-  if (nonNullType instanceof GraphQLScalarType) {
-    switch (nonNullType.name) {
-      case 'BigInt':
-        return 'bigint';
-      case 'Boolean':
-        return 'boolean';
-      case 'Text':
-        return 'string';
-      default:
-        // TODO: handle decimal types - currently decimal types are defined
-        // in options so we don't have access from codegen, we just assume string
-        return 'string';
-    }
-  }
-
-  if (nonNullType instanceof GraphQLList) {
-    return `${getBaseType(nonNullType.ofType)}[]`;
-  }
-
-  return null;
+  return getTypeInfo(nonNullType).type;
 };
 
 export const getJSType = (field: GraphQLField<any, any>) => {
@@ -122,7 +108,7 @@ export const codegen = (schema: string) => {
         return;
       }
 
-      const initialValue = field.name === 'id' ? 'id' : JSON.stringify(getInitialValue(field));
+      const initialValue = field.name === 'id' ? 'id' : JSON.stringify(getInitialValue(field.type));
       contents += `    this.initialSet('${field.name}', ${initialValue});\n`;
     });
     contents += `  }\n\n`;

@@ -1,5 +1,5 @@
 import { GraphQLObjectType, buildSchema } from 'graphql';
-import { getInitialValue, getBaseType, getJSType, codegen } from '../../src/codegen';
+import { getInitialValue, getBaseType, getJSType, codegen, getTypeInfo } from '../../src/codegen';
 import { extendSchema } from '../../src/utils/graphql';
 
 const SCHEMA_SOURCE = `
@@ -37,39 +37,44 @@ const proposal = schema.getType('Proposal') as GraphQLObjectType;
 const spaceFields = space.getFields();
 const proposalFields = proposal.getFields();
 
+describe('getTypeInfo', () => {
+  it('should throw when passed a wrapped type', () => {
+    expect(() => getTypeInfo(spaceFields['controller'].type)).toThrow();
+  });
+});
+
 describe('getInitialValue', () => {
   it('should return null for nullable types', () => {
-    expect(getInitialValue(spaceFields['name'])).toBeNull();
-    expect(getInitialValue(spaceFields['about'])).toBeNull();
+    expect(getInitialValue(spaceFields['name'].type)).toBeNull();
+    expect(getInitialValue(spaceFields['about'].type)).toBeNull();
   });
 
   it('should return 0 for Int/Float/BigInt types', () => {
-    expect(getInitialValue(spaceFields['voting_delay'])).toBe(0);
-    expect(getInitialValue(spaceFields['proposal_threshold'])).toBe(0);
-    expect(getInitialValue(spaceFields['quorum'])).toBe(0);
+    expect(getInitialValue(spaceFields['voting_delay'].type)).toBe(0);
+    expect(getInitialValue(spaceFields['proposal_threshold'].type)).toBe(0);
+    expect(getInitialValue(spaceFields['quorum'].type)).toBe(0);
   });
 
   it('should return 0 string for BigDecimal types', () => {
-    expect(getInitialValue(proposalFields['progress'])).toBe('0');
+    expect(getInitialValue(proposalFields['progress'].type)).toBe('0');
   });
 
   it('should return empty string for String/Text/Id types', () => {
-    expect(getInitialValue(spaceFields['id'])).toBe('');
-    expect(getInitialValue(spaceFields['controller'])).toBe('');
-    expect(getInitialValue(proposalFields['title'])).toBe('');
+    expect(getInitialValue(spaceFields['id'].type)).toBe('');
+    expect(getInitialValue(spaceFields['controller'].type)).toBe('');
+    expect(getInitialValue(proposalFields['title'].type)).toBe('');
   });
 
   it('should return false for Boolean types', () => {
-    expect(getInitialValue(proposalFields['active'])).toBe(false);
+    expect(getInitialValue(proposalFields['active'].type)).toBe(false);
   });
 
   it('should return empty array for List types', () => {
-    expect(getInitialValue(spaceFields['strategies'])).toEqual([]);
+    expect(getInitialValue(spaceFields['strategies'].type)).toEqual([]);
   });
 
-  it('should return null for unknown types', () => {
-    // TODO: replace with real unknown time once BigDecimals are handled
-    expect(getInitialValue(proposalFields['space'])).toBeNull();
+  it('should return empty string for object types', () => {
+    expect(getInitialValue(proposalFields['space'].type)).toBe('');
   });
 });
 
@@ -104,8 +109,6 @@ describe('getBaseType', () => {
   it('should return array type for List types', () => {
     expect(getBaseType(spaceFields['strategies'].type)).toBe('string[]');
   });
-
-  // TODO: handle unknown types
 });
 
 describe('getJSType', () => {

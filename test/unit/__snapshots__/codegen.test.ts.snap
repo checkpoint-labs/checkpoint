@@ -106,7 +106,7 @@ export class Proposal extends Model {
 
     this.initialSet('id', id);
     this.initialSet('proposal_id', 0);
-    this.initialSet('space', null);
+    this.initialSet('space', "");
     this.initialSet('title', "");
     this.initialSet('scores_total', 0);
     this.initialSet('active', false);
