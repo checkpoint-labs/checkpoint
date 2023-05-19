@@ -7,6 +7,7 @@ scalar Id
 scalar Text
 scalar BigInt
 scalar BigDecimal
+scalar Unknown
 
 type Space {
   id: String!
@@ -17,6 +18,7 @@ type Space {
   proposal_threshold: BigInt!
   quorum: Float!
   strategies: [String]!
+  strategies_nonnull: [String!]!
   proposals: [Proposal]! @derivedFrom(field: "space")
 }
 
@@ -38,8 +40,37 @@ const spaceFields = space.getFields();
 const proposalFields = proposal.getFields();
 
 describe('getTypeInfo', () => {
+  const simpleSchema = `scalar HugeDecimal
+type Space {
+  id: String!
+  value: HugeDecimal
+}
+`;
+
+  const customDecimalTypes = {
+    HugeDecimal: {
+      p: 30,
+      d: 14
+    }
+  };
+
+  const schema = buildSchema(extendSchema(simpleSchema));
+  const space = schema.getType('Space') as GraphQLObjectType;
+  const spaceFields = space.getFields();
+
   it('should throw when passed a wrapped type', () => {
-    expect(() => getTypeInfo(spaceFields['controller'].type)).toThrow();
+    expect(() => getTypeInfo(spaceFields['id'].type)).toThrow();
+  });
+
+  it('should throw when passing unknown types', () => {
+    expect(() => getTypeInfo(spaceFields['value'].type)).toThrow();
+  });
+
+  it('should handle non-default decimalTypes', () => {
+    expect(getTypeInfo(spaceFields['value'].type, customDecimalTypes)).toEqual({
+      type: 'string',
+      initialValue: '0'
+    });
   });
 });
 
@@ -71,10 +102,15 @@ describe('getInitialValue', () => {
 
   it('should return empty array for List types', () => {
     expect(getInitialValue(spaceFields['strategies'].type)).toEqual([]);
+    expect(getInitialValue(spaceFields['strategies_nonnull'].type)).toEqual([]);
   });
 
   it('should return empty string for object types', () => {
     expect(getInitialValue(proposalFields['space'].type)).toBe('');
+  });
+
+  it('should return "0" for BigDecimal types', () => {
+    expect(getInitialValue(proposalFields['progress'].type)).toBe('0');
   });
 });
 
@@ -108,6 +144,11 @@ describe('getBaseType', () => {
 
   it('should return array type for List types', () => {
     expect(getBaseType(spaceFields['strategies'].type)).toBe('string[]');
+    expect(getBaseType(spaceFields['strategies_nonnull'].type)).toBe('string[]');
+  });
+
+  it('should return string for BigDecimal types', () => {
+    expect(getBaseType(proposalFields['progress'].type)).toBe('string');
   });
 });
 

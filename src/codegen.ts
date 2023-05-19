@@ -21,7 +21,23 @@ type TypeInfo = {
   initialValue: any;
 };
 
-export const getTypeInfo = (type: GraphQLType): TypeInfo => {
+type DecimalTypes = NonNullable<CheckpointConfig['decimal_types']>;
+
+const DEFAULT_DECIMAL_TYPES = {
+  Decimal: {
+    p: 10,
+    d: 2
+  },
+  BigDecimal: {
+    p: 20,
+    d: 8
+  }
+};
+
+export const getTypeInfo = (
+  type: GraphQLType,
+  decimalTypes: DecimalTypes = DEFAULT_DECIMAL_TYPES
+): TypeInfo => {
   if (type instanceof GraphQLNonNull) {
     throw new Error('Type must raw type');
   }
@@ -43,10 +59,10 @@ export const getTypeInfo = (type: GraphQLType): TypeInfo => {
         return { type: 'boolean', initialValue: false };
       case 'Text':
         return { type: 'string', initialValue: '' };
-      default:
-        // TODO: handle decimal types - currently decimal types are defined
-        // in options so we don't have access from codegen
-        return { type: 'string', initialValue: '0' };
+    }
+
+    if (type.name in decimalTypes) {
+      return { type: 'string', initialValue: '0' };
     }
   }
 
@@ -58,31 +74,40 @@ export const getTypeInfo = (type: GraphQLType): TypeInfo => {
     const nonNullNestedType =
       type.ofType instanceof GraphQLNonNull ? type.ofType.ofType : type.ofType;
 
-    return { type: `${getTypeInfo(nonNullNestedType).type}[]`, initialValue: [] };
+    return { type: `${getTypeInfo(nonNullNestedType, decimalTypes).type}[]`, initialValue: [] };
   }
 
   throw new Error('Unknown type');
 };
 
-export const getInitialValue = (type: GraphQLType) => {
+export const getInitialValue = (
+  type: GraphQLType,
+  decimalTypes: DecimalTypes = DEFAULT_DECIMAL_TYPES
+) => {
   if (!(type instanceof GraphQLNonNull)) {
     return null;
   }
 
-  return getTypeInfo(type.ofType).initialValue;
+  return getTypeInfo(type.ofType, decimalTypes).initialValue;
 };
 
-export const getBaseType = (type: GraphQLType) => {
+export const getBaseType = (
+  type: GraphQLType,
+  decimalTypes: DecimalTypes = DEFAULT_DECIMAL_TYPES
+) => {
   const nonNullType = type instanceof GraphQLNonNull ? type.ofType : type;
 
-  return getTypeInfo(nonNullType).type;
+  return getTypeInfo(nonNullType, decimalTypes).type;
 };
 
-export const getJSType = (field: GraphQLField<any, any>) => {
+export const getJSType = (
+  field: GraphQLField<any, any>,
+  decimalTypes: DecimalTypes = DEFAULT_DECIMAL_TYPES
+) => {
   const nonNullType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
   const isNullable = !(field.type instanceof GraphQLNonNull);
   const isList = nonNullType instanceof GraphQLList;
-  const baseType = getBaseType(nonNullType);
+  const baseType = getBaseType(nonNullType, decimalTypes);
 
   return { isNullable, isList, baseType };
 };
@@ -92,6 +117,7 @@ export const codegen = (
   config: CheckpointConfig,
   format: 'typescript' | 'javascript'
 ) => {
+  const decimalTypes = config.decimal_types || DEFAULT_DECIMAL_TYPES;
   const extendedSchema = extendSchema(schema);
   const controller = new GqlEntityController(extendedSchema, config);
 
@@ -113,7 +139,8 @@ export const codegen = (
         return;
       }
 
-      const initialValue = field.name === 'id' ? 'id' : JSON.stringify(getInitialValue(field.type));
+      const rawInitialValue = getInitialValue(field.type, decimalTypes);
+      const initialValue = field.name === 'id' ? 'id' : JSON.stringify(rawInitialValue);
       contents += `    this.initialSet('${field.name}', ${initialValue});\n`;
     });
     contents += `  }\n\n`;
@@ -138,7 +165,7 @@ export const codegen = (
         return;
       }
 
-      const { isNullable, isList, baseType } = getJSType(field);
+      const { isNullable, isList, baseType } = getJSType(field, decimalTypes);
       const typeAnnotation = isNullable ? `${baseType} | null` : baseType;
 
       contents +=

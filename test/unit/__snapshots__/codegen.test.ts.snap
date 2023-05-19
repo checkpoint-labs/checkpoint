@@ -17,6 +17,7 @@ export class Space extends Model {
     this.initialSet('proposal_threshold', 0);
     this.initialSet('quorum', 0);
     this.initialSet('strategies', []);
+    this.initialSet('strategies_nonnull', []);
   }
 
   static async loadEntity(id) {
@@ -95,6 +96,14 @@ export class Space extends Model {
 
   set strategies(value) {
     this.set('strategies', JSON.stringify(value));
+  }
+
+  get strategies_nonnull() {
+    return JSON.parse(this.get('strategies_nonnull'));
+  }
+
+  set strategies_nonnull(value) {
+    this.set('strategies_nonnull', JSON.stringify(value));
   }
 }
 
@@ -203,6 +212,7 @@ export class Space extends Model {
     this.initialSet('proposal_threshold', 0);
     this.initialSet('quorum', 0);
     this.initialSet('strategies', []);
+    this.initialSet('strategies_nonnull', []);
   }
 
   static async loadEntity(id: string): Promise<Space | null> {
@@ -281,6 +291,14 @@ export class Space extends Model {
 
   set strategies(value: string[]) {
     this.set('strategies', JSON.stringify(value));
+  }
+
+  get strategies_nonnull(): string[] {
+    return JSON.parse(this.get('strategies_nonnull'));
+  }
+
+  set strategies_nonnull(value: string[]) {
+    this.set('strategies_nonnull', JSON.stringify(value));
   }
 }
 
