@@ -91,6 +91,7 @@ export function createResponseValidator({ maxRetries }: { maxRetries: number }) 
       return true;
     }
 
+    retryCounter++;
     return false;
   };
 }
