@@ -14,6 +14,7 @@ import {
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
 import { extendSchema } from './utils/graphql';
+import { CheckpointConfig } from './types';
 
 type TypeInfo = {
   type: string;
@@ -86,9 +87,13 @@ export const getJSType = (field: GraphQLField<any, any>) => {
   return { isNullable, isList, baseType };
 };
 
-export const codegen = (schema: string, format: 'typescript' | 'javascript') => {
+export const codegen = (
+  schema: string,
+  config: CheckpointConfig,
+  format: 'typescript' | 'javascript'
+) => {
   const extendedSchema = extendSchema(schema);
-  const controller = new GqlEntityController(extendedSchema);
+  const controller = new GqlEntityController(extendedSchema, config);
 
   const preamble = `import { Model } from '@snapshot-labs/checkpoint';\n\n`;
 

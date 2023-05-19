@@ -130,11 +130,16 @@ describe('getJSType', () => {
 });
 
 describe('codegen', () => {
+  const config = {
+    network_node_url: '',
+    sources: []
+  };
+
   it('should generate typescript code', () => {
-    expect(codegen(SCHEMA_SOURCE, 'typescript')).toMatchSnapshot();
+    expect(codegen(SCHEMA_SOURCE, config, 'typescript')).toMatchSnapshot();
   });
 
   it('should generate javascript code', () => {
-    expect(codegen(SCHEMA_SOURCE, 'javascript')).toMatchSnapshot();
+    expect(codegen(SCHEMA_SOURCE, config, 'javascript')).toMatchSnapshot();
   });
 });
