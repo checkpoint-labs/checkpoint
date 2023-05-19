@@ -29,9 +29,6 @@ export interface CheckpointOptions {
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
   dbConnection?: string;
-  // Configuration for decimal types
-  // defaults to Decimal(10, 2), BigDecimal(20, 8)
-  decimalTypes?: { [key: string]: { p: number; d: number } };
   // Abis for contracts needed for automatic event parsing
   abis?: Record<string, any>;
   // BaseProvider based class that defines how blocks are fetched and processed.
@@ -67,6 +64,9 @@ export type ContractTemplate = {
 export interface CheckpointConfig {
   network_node_url: string;
   optimistic_indexing?: boolean;
+  // Configuration for decimal types
+  // defaults to Decimal(10, 2), BigDecimal(20, 8)
+  decimal_types?: { [key: string]: { p: number; d: number } };
   start?: number;
   tx_fn?: string;
   global_events?: ContractEventConfig[];

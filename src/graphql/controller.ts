@@ -30,7 +30,7 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
-import { CheckpointOptions } from '../types';
+import { CheckpointConfig, CheckpointOptions } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
 
 /**
@@ -59,12 +59,12 @@ const GraphQLOrderDirection = new GraphQLEnumType({
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
-  private readonly decimalTypes: NonNullable<CheckpointOptions['decimalTypes']>;
+  private readonly decimalTypes: NonNullable<CheckpointConfig['decimal_types']>;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source, opts?: CheckpointOptions) {
+  constructor(typeDefs: string | Source, config?: CheckpointConfig) {
     this.schema = buildSchema(typeDefs);
-    this.decimalTypes = opts?.decimalTypes || {
+    this.decimalTypes = config?.decimal_types || {
       Decimal: {
         p: 10,
         d: 2

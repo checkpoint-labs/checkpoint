@@ -54,7 +54,7 @@ export default class Checkpoint {
 
     this.validateConfig();
 
-    this.entityController = new GqlEntityController(this.schema, opts);
+    this.entityController = new GqlEntityController(this.schema, config);
 
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
