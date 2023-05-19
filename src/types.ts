@@ -25,6 +25,8 @@ export interface CheckpointOptions {
   // optionally format logs to pretty output.
   // Not recommended for production.
   prettifyLogs?: boolean;
+  // Optional interval in milliseconds to check for new blocks.
+  fetchInterval?: number;
   // Optional database connection string. For now only accepts PostgreSQL and MySQL/MariaDB
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
