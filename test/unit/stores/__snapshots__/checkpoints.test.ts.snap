@@ -7,13 +7,13 @@ create table \`_metadatas\` (\`id\` varchar(20), \`value\` varchar(128) not null
 `;
 
 exports[`CheckpointsStore insertCheckpoints should insert checkpoints 1`] = `
-Array [
-  Object {
+[
+  {
     "block_number": 5000,
     "contract_address": "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
     "id": "a739beda26",
   },
-  Object {
+  {
     "block_number": 123222,
     "contract_address": "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
     "id": "d2b8dcc2b5",

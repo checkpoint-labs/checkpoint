@@ -2,9 +2,9 @@
 
 exports[`createMySqlPool() should use argument string to create connection 1`] = `
 [MockFunction] {
-  "calls": Array [
-    Array [
-      Object {
+  "calls": [
+    [
+      {
         "bigNumberStrings": true,
         "charset": "utf8mb4",
         "connectTimeout": 30000,
@@ -19,8 +19,8 @@ exports[`createMySqlPool() should use argument string to create connection 1`] =
       },
     ],
   ],
-  "results": Array [
-    Object {
+  "results": [
+    {
       "type": "return",
       "value": undefined,
     },

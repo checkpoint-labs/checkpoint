@@ -1,8 +1,8 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`utils parseEvent should parse event 1`] = `
-Object {
-  "authenticators": Array [
+{
+  "authenticators": [
     "0x64cce9272197eba6353f5bbf060e097e516b411e66e83a9cf5910a08697df14",
     "0x4112e7aef90c47058238ccb76bf79ad5188afdf366870015185e3c7468ccbd9",
     "0x68a2d3c6d882ec0e2e94042556878d27e832a28e1308df04ad35fd8bae9ec6b",
@@ -13,7 +13,7 @@ Object {
   "authenticators_len": "0x6",
   "controller": "0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6",
   "deployer_address": "0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6",
-  "execution_strategies": Array [
+  "execution_strategies": [
     "0x4ecc83848a519cc22b0d0ffb70e65ec8dde85d3d13439eff7145d4063cf6b4d",
     "0x21dda40770f4317582251cffd5a0202d6b223dc167e5c8db25dc887d11eba81",
   ],
@@ -22,22 +22,22 @@ Object {
   "metadata_uri": undefined,
   "metadata_uri_len": "0x0",
   "min_voting_duration": "0x0",
-  "proposal_threshold": Object {
+  "proposal_threshold": {
     "high": "0x0",
     "low": "0x1",
   },
-  "quorum": Object {
+  "quorum": {
     "high": "0x0",
     "low": "0x1",
   },
   "space_address": "0x3993631a1336a81c474e2cf5ebbb3e820547ad14e6f6a7afcdac9d35eaccac5",
   "voting_delay": "0x0",
-  "voting_strategies": Array [
+  "voting_strategies": [
     "0x58623786b93d9b6ed1f83cec5c6fa6bea5f399d2795ee56a6123bdd83f5aa48",
     "0xd1b81feff3095ca9517fdfc7427e742ce96f7ca8f3b2664a21b2fba552493b",
   ],
   "voting_strategies_len": "0x2",
-  "voting_strategy_params_flat": Array [
+  "voting_strategy_params_flat": [
     "0x2",
     "0x0",
     "0x0",
@@ -49,16 +49,16 @@ Object {
 `;
 
 exports[`utils parseEvent should parse nested event 1`] = `
-Object {
+{
   "proposal_id": "0xf",
-  "vote": Object {
+  "vote": {
     "choice": "0x1",
-    "voting_power": Object {
+    "voting_power": {
       "high": "0x0",
       "low": "0x23cdb7dc255bf4da",
     },
   },
-  "voter_address": Object {
+  "voter_address": {
     "value": "0xef8305e140ac520225daf050e2f71d5fbcc543e7",
   },
 }

@@ -3,6 +3,12 @@ import { mockDeep } from 'jest-mock-extended';
 import { CheckpointsStore } from '../../../src/stores/checkpoints';
 import { Logger } from '../../../src/utils/logger';
 
+function createMockLogger() {
+  return mockDeep<Logger>({
+    child: () => createMockLogger()
+  });
+}
+
 describe('CheckpointsStore', () => {
   const mockKnex = knex({
     client: 'sqlite3',
@@ -12,10 +18,7 @@ describe('CheckpointsStore', () => {
     useNullAsDefault: true
   });
 
-  const logger = mockDeep<Logger>({
-    child: () => mockDeep()
-  });
-
+  const logger = createMockLogger();
   const store = new CheckpointsStore(mockKnex, logger);
 
   afterAll(async () => {
