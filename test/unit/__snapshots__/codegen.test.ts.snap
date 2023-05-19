@@ -1,6 +1,192 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`codegen should generate code 1`] = `
+exports[`codegen should generate javascript code 1`] = `
+"import { Model } from '@snapshot-labs/checkpoint';
+
+export class Space extends Model {
+  static tableName = 'spaces';
+
+  constructor(id) {
+    super(Space.tableName);
+
+    this.initialSet('id', id);
+    this.initialSet('name', null);
+    this.initialSet('about', null);
+    this.initialSet('controller', "");
+    this.initialSet('voting_delay', 0);
+    this.initialSet('proposal_threshold', 0);
+    this.initialSet('quorum', 0);
+    this.initialSet('strategies', []);
+  }
+
+  static async loadEntity(id) {
+    const entity = await super.loadEntity(Space.tableName, id);
+    if (!entity) return null;
+
+    const model = new Space(id);
+    model.setExists();
+
+    for (const key in entity) {
+      model.set(key, entity[key]);
+    }
+
+    return model;
+  }
+
+  get id() {
+    return this.get('id');
+  }
+
+  set id(value) {
+    this.set('id', value);
+  }
+
+  get name() {
+    return this.get('name');
+  }
+
+  set name(value) {
+    this.set('name', value);
+  }
+
+  get about() {
+    return this.get('about');
+  }
+
+  set about(value) {
+    this.set('about', value);
+  }
+
+  get controller() {
+    return this.get('controller');
+  }
+
+  set controller(value) {
+    this.set('controller', value);
+  }
+
+  get voting_delay() {
+    return this.get('voting_delay');
+  }
+
+  set voting_delay(value) {
+    this.set('voting_delay', value);
+  }
+
+  get proposal_threshold() {
+    return this.get('proposal_threshold');
+  }
+
+  set proposal_threshold(value) {
+    this.set('proposal_threshold', value);
+  }
+
+  get quorum() {
+    return this.get('quorum');
+  }
+
+  set quorum(value) {
+    this.set('quorum', value);
+  }
+
+  get strategies() {
+    return JSON.parse(this.get('strategies'));
+  }
+
+  set strategies(value) {
+    this.set('strategies', JSON.stringify(value));
+  }
+}
+
+export class Proposal extends Model {
+  static tableName = 'proposals';
+
+  constructor(id) {
+    super(Proposal.tableName);
+
+    this.initialSet('id', id);
+    this.initialSet('proposal_id', 0);
+    this.initialSet('space', "");
+    this.initialSet('title', "");
+    this.initialSet('scores_total', 0);
+    this.initialSet('active', false);
+    this.initialSet('progress', "0");
+  }
+
+  static async loadEntity(id) {
+    const entity = await super.loadEntity(Proposal.tableName, id);
+    if (!entity) return null;
+
+    const model = new Proposal(id);
+    model.setExists();
+
+    for (const key in entity) {
+      model.set(key, entity[key]);
+    }
+
+    return model;
+  }
+
+  get id() {
+    return this.get('id');
+  }
+
+  set id(value) {
+    this.set('id', value);
+  }
+
+  get proposal_id() {
+    return this.get('proposal_id');
+  }
+
+  set proposal_id(value) {
+    this.set('proposal_id', value);
+  }
+
+  get space() {
+    return this.get('space');
+  }
+
+  set space(value) {
+    this.set('space', value);
+  }
+
+  get title() {
+    return this.get('title');
+  }
+
+  set title(value) {
+    this.set('title', value);
+  }
+
+  get scores_total() {
+    return this.get('scores_total');
+  }
+
+  set scores_total(value) {
+    this.set('scores_total', value);
+  }
+
+  get active() {
+    return this.get('active');
+  }
+
+  set active(value) {
+    this.set('active', value);
+  }
+
+  get progress() {
+    return this.get('progress');
+  }
+
+  set progress(value) {
+    this.set('progress', value);
+  }
+}
+"
+`;
+
+exports[`codegen should generate typescript code 1`] = `
 "import { Model } from '@snapshot-labs/checkpoint';
 
 export class Space extends Model {

@@ -20,7 +20,7 @@ async function run() {
   const schemaFilePath = path.join(cwd, schemaFile);
   const schema = await fs.readFile(schemaFilePath, 'utf8');
 
-  const generatedModels = codegen(schema);
+  const generatedModels = codegen(schema, 'typescript');
 
   await fs.mkdir(path.join(cwd, 'codegen'), { recursive: true });
   await fs.writeFile(path.join(cwd, OUTPUT_PATH), generatedModels);

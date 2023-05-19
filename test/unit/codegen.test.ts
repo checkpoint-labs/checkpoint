@@ -130,7 +130,11 @@ describe('getJSType', () => {
 });
 
 describe('codegen', () => {
-  it('should generate code', () => {
-    expect(codegen(SCHEMA_SOURCE)).toMatchSnapshot();
+  it('should generate typescript code', () => {
+    expect(codegen(SCHEMA_SOURCE, 'typescript')).toMatchSnapshot();
+  });
+
+  it('should generate javascript code', () => {
+    expect(codegen(SCHEMA_SOURCE, 'javascript')).toMatchSnapshot();
   });
 });

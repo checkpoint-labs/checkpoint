@@ -86,7 +86,7 @@ export const getJSType = (field: GraphQLField<any, any>) => {
   return { isNullable, isList, baseType };
 };
 
-export const codegen = (schema: string) => {
+export const codegen = (schema: string, format: 'typescript' | 'javascript') => {
   const extendedSchema = extendSchema(schema);
   const controller = new GqlEntityController(extendedSchema);
 
@@ -100,7 +100,7 @@ export const codegen = (schema: string) => {
     contents += `export class ${modelName} extends Model {\n`;
     contents += `  static tableName = '${pluralize(modelName.toLowerCase())}';\n\n`;
 
-    contents += `  constructor(id: string) {\n`;
+    contents += format === 'javascript' ? `  constructor(id) {\n` : `  constructor(id: string) {\n`;
     contents += `    super(${modelName}.tableName);\n\n`;
     controller.getTypeFields(type).forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
@@ -113,7 +113,10 @@ export const codegen = (schema: string) => {
     });
     contents += `  }\n\n`;
 
-    contents += `  static async loadEntity(id: string): Promise<${modelName} | null> {\n`;
+    contents +=
+      format === 'javascript'
+        ? `  static async loadEntity(id) {\n`
+        : `  static async loadEntity(id: string): Promise<${modelName} | null> {\n`;
     contents += `    const entity = await super.loadEntity(${modelName}.tableName, id);\n`;
     contents += `    if (!entity) return null;\n\n`;
     contents += `    const model = new ${modelName}(id);\n`;
@@ -133,13 +136,19 @@ export const codegen = (schema: string) => {
       const { isNullable, isList, baseType } = getJSType(field);
       const typeAnnotation = isNullable ? `${baseType} | null` : baseType;
 
-      contents += `  get ${field.name}(): ${typeAnnotation} {\n`;
+      contents +=
+        format === 'javascript'
+          ? `  get ${field.name}() {\n`
+          : `  get ${field.name}(): ${typeAnnotation} {\n`;
       contents += `    return ${
         isList ? `JSON.parse(this.get('${field.name}'))` : `this.get('${field.name}')`
       };\n`;
       contents += `  }\n\n`;
 
-      contents += `  set ${field.name}(value: ${typeAnnotation}) {\n`;
+      contents +=
+        format === 'javascript'
+          ? `  set ${field.name}(value) {\n`
+          : `  set ${field.name}(value: ${typeAnnotation}) {\n`;
       contents += `    this.set('${field.name}', ${isList ? `JSON.stringify(value)` : 'value'});\n`;
       contents += `  }\n\n`;
     });
