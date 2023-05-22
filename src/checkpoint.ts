@@ -8,6 +8,7 @@ import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getContractsFromConfig } from './utils/checkpoint';
+import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
@@ -49,11 +50,11 @@ export default class Checkpoint {
     this.config = config;
     this.writer = writer;
     this.opts = opts;
-    this.schema = this.extendSchema(schema);
+    this.schema = extendSchema(schema);
 
     this.validateConfig();
 
-    this.entityController = new GqlEntityController(this.schema, opts);
+    this.entityController = new GqlEntityController(this.schema, config);
 
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
@@ -373,11 +374,6 @@ export default class Checkpoint {
         }
       }
     ) as PgPool;
-  }
-
-  private extendSchema(schema: string): string {
-    return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
-${schema}`;
   }
 
   private validateConfig() {

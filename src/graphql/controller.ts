@@ -30,7 +30,7 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
-import { CheckpointOptions } from '../types';
+import { CheckpointConfig, CheckpointOptions } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
 
 /**
@@ -59,12 +59,12 @@ const GraphQLOrderDirection = new GraphQLEnumType({
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
-  private readonly decimalTypes: NonNullable<CheckpointOptions['decimalTypes']>;
+  private readonly decimalTypes: NonNullable<CheckpointConfig['decimal_types']>;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source, opts?: CheckpointOptions) {
+  constructor(typeDefs: string | Source, config?: CheckpointConfig) {
     this.schema = buildSchema(typeDefs);
-    this.decimalTypes = opts?.decimalTypes || {
+    this.decimalTypes = config?.decimal_types || {
       Decimal: {
         p: 10,
         d: 2
@@ -202,7 +202,7 @@ export class GqlEntityController {
     }
 
     this.schemaObjects.map(type => {
-      const tableName = pluralize(pluralize(type.name.toLowerCase()));
+      const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
         t.primary(['id']);
@@ -260,7 +260,7 @@ export class GqlEntityController {
    * Note: that the returned objects does not include the Query object type if defined.
    *
    */
-  private get schemaObjects(): GraphQLObjectType[] {
+  public get schemaObjects(): GraphQLObjectType[] {
     if (this._schemaObjects) {
       return this._schemaObjects;
     }
@@ -274,7 +274,7 @@ export class GqlEntityController {
     return this._schemaObjects;
   }
 
-  private getTypeFields<Parent, Context>(
+  public getTypeFields<Parent, Context>(
     type: GraphQLObjectType<Parent, Context>
   ): GraphQLField<Parent, Context>[] {
     return Object.values(type.getFields());
