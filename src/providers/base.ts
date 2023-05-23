@@ -44,6 +44,10 @@ export class BaseProvider {
     }
   }
 
+  getNetworkIdentifier(): Promise<string> {
+    throw new Error('getNetworkIdentifier method was not defined');
+  }
+
   processBlock(blockNum: number): Promise<number> {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
   }

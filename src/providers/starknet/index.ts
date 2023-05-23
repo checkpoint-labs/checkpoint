@@ -25,6 +25,11 @@ export class StarknetProvider extends BaseProvider {
     });
   }
 
+  async getNetworkIdentifier(): Promise<string> {
+    const result = await this.provider.getChainId();
+    return `starknet_${result}`;
+  }
+
   async processBlock(blockNum: number) {
     let block: Block;
     let blockEvents: EventsMap;

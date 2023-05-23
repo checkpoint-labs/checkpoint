@@ -19,6 +19,8 @@ export type EventsMap = { [key: string]: Event[] };
 export type ParsedEvent = Record<string, any>;
 
 export interface CheckpointOptions {
+  // Setting to true will trigger reset of database on config changes.
+  resetOnConfigChange?: boolean;
   // Set the log output levels for checkpoint. Defaults to Error.
   // Note, this does not affect the log outputs in writers.
   logLevel?: LogLevel;
