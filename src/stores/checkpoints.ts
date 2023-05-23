@@ -34,7 +34,8 @@ export interface CheckpointRecord {
  */
 export enum MetadataId {
   LastIndexedBlock = 'last_indexed_block',
-  NetworkIdentifier = 'network_identifier'
+  NetworkIdentifier = 'network_identifier',
+  StartBlock = 'start_block'
 }
 
 const CheckpointIdSize = 10;
