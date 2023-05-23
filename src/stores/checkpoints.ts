@@ -116,7 +116,7 @@ export class CheckpointsStore {
     }
 
     if (hasMetadataTable) {
-      await this.knex(Table.Checkpoints).truncate();
+      await this.knex(Table.Metadata).truncate();
     }
 
     this.log.debug('checkpoints tables truncated');
