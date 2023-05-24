@@ -7,7 +7,7 @@ import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './g
 import { GqlEntityController } from './graphql/controller';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
-import { getContractsFromConfig } from './utils/checkpoint';
+import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
@@ -411,23 +411,31 @@ export default class Checkpoint {
 
   private async validateStore() {
     const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
+    const configChecksum = getConfigChecksum(this.config);
+
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
     const storedStartBlock = await this.store.getMetadataNumber(MetadataId.StartBlock);
+    const storedConfigChecksum = await this.store.getMetadata(MetadataId.ConfigChecksum);
     const hasNetworkChanged =
       storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
     const hasStartBlockChanged =
       storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
+    const hasConfigChanged = storedConfigChecksum && storedConfigChecksum !== configChecksum;
 
-    if ((hasNetworkChanged || hasStartBlockChanged) && this.opts?.resetOnConfigChange) {
+    if (
+      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged) &&
+      this.opts?.resetOnConfigChange
+    ) {
       await this.resetMetadata();
       await this.reset();
 
       await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
       await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
+      await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
     } else if (hasNetworkChanged) {
       this.log.error(
         `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
-          You probably should reset the database by calling .reset() and resetMetadata().
+        You probably should reset the database by calling .reset() and resetMetadata().
           You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
       );
 
@@ -435,15 +443,31 @@ export default class Checkpoint {
     } else if (hasStartBlockChanged) {
       this.log.error(
         `start block changed from ${storedStartBlock} to ${this.getConfigStartBlock()}.
+        You probably should reset the database by calling .reset() and resetMetadata().
+        You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
+      );
+
+      throw new Error('start block changed');
+    } else if (hasConfigChanged) {
+      this.log.error(
+        `config checksum changed from ${storedConfigChecksum} to ${configChecksum} to due to a change in the config.
           You probably should reset the database by calling .reset() and resetMetadata().
           You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
       );
 
-      throw new Error('start block changed');
-    } else if (!storedNetworkIdentifier) {
-      await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
-    } else if (!storedStartBlock) {
-      await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
+      throw new Error('config changed');
+    } else {
+      if (!storedNetworkIdentifier) {
+        await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
+      }
+
+      if (!storedStartBlock) {
+        await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
+      }
+
+      if (!storedConfigChecksum) {
+        await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
+      }
     }
   }
 }
