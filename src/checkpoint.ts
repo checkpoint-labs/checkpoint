@@ -456,12 +456,18 @@ export default class Checkpoint {
       );
 
       throw new Error('config changed');
-    } else if (!storedNetworkIdentifier) {
-      await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
-    } else if (!storedStartBlock) {
-      await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
-    } else if (!storedConfigChecksum) {
-      await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
+    } else {
+      if (!storedNetworkIdentifier) {
+        await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
+      }
+
+      if (!storedStartBlock) {
+        await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
+      }
+
+      if (!storedConfigChecksum) {
+        await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
+      }
     }
   }
 }
