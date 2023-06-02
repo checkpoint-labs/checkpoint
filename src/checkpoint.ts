@@ -323,7 +323,7 @@ export default class Checkpoint {
   }
 
   private async nextEvents(blockNum: number) {
-    if (!this.prefetchEndBlock) throw new Error('preloadEndBlock is not set');
+    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
     if (blockNum > this.prefetchEndBlock) {
       this.prefetchDone = true;
       return;
@@ -344,7 +344,7 @@ export default class Checkpoint {
   }
 
   private async next(blockNum: number) {
-    if (!this.prefetchEndBlock) throw new Error('preloadEndBlock is not set');
+    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
 
     if (!this.config.tx_fn && !this.config.global_events) {
       if (blockNum <= this.prefetchEndBlock) {
