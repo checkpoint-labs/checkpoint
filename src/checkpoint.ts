@@ -68,9 +68,6 @@ export default class Checkpoint {
 
     this.entityController = new GqlEntityController(this.schema, config);
 
-    this.sourceContracts = getContractsFromConfig(config);
-    this.cpBlocksCache = [];
-
     this.log = createLogger({
       base: { component: 'checkpoint' },
       level: opts?.logLevel || LogLevel.Error,
@@ -85,6 +82,9 @@ export default class Checkpoint {
 
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
     this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
+
+    this.sourceContracts = this.networkProvider.formatAddresses(getContractsFromConfig(config));
+    this.cpBlocksCache = [];
 
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
     if (!dbConnection) {
@@ -221,7 +221,9 @@ export default class Checkpoint {
     if (!this.config.sources) this.config.sources = [];
 
     this.config.sources.push(source);
-    this.sourceContracts = getContractsFromConfig(this.config);
+    this.sourceContracts = this.networkProvider.formatAddresses(
+      getContractsFromConfig(this.config)
+    );
     this.cpBlocksCache = [];
   }
 

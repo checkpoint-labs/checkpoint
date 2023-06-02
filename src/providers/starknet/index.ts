@@ -26,6 +26,10 @@ export class StarknetProvider extends BaseProvider {
     });
   }
 
+  formatAddresses(addresses: string[]): string[] {
+    return addresses.map(address => validateAndParseAddress(address));
+  }
+
   async getNetworkIdentifier(): Promise<string> {
     const result = await this.provider.getChainId();
     return `starknet_${result}`;

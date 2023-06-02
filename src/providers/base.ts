@@ -46,6 +46,12 @@ export class BaseProvider {
     }
   }
 
+  formatAddresses(addresses: string[]): string[] {
+    throw new Error(
+      `formatAddresses method was not defined when formatting ${addresses.length} addresses`
+    );
+  }
+
   getNetworkIdentifier(): Promise<string> {
     throw new Error('getNetworkIdentifier method was not defined');
   }
