@@ -18,6 +18,12 @@ export type DeployTransaction = Transaction & { contract_address: string };
 export type EventsMap = { [key: string]: Event[] };
 export type ParsedEvent = Record<string, any>;
 
+export type TemplateSource = {
+  contractAddress: string;
+  startBlock: number;
+  template: string;
+};
+
 export interface CheckpointOptions {
   // Setting to true will trigger reset of database on config changes.
   resetOnConfigChange?: boolean;

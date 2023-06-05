@@ -1,12 +1,13 @@
 import { Pool as PgPool } from 'pg';
-import type { Logger } from '../utils/logger';
-import type Checkpoint from '../checkpoint';
-import type { AsyncMySqlPool } from '../mysql';
-import type { CheckpointConfig, CheckpointWriters } from '../types';
+import { Logger } from '../utils/logger';
+import Checkpoint from '../checkpoint';
+import { AsyncMySqlPool } from '../mysql';
+import { CheckpointConfig, CheckpointWriters, ContractSourceConfig } from '../types';
 
 type Instance = {
   writer: CheckpointWriters;
   config: CheckpointConfig;
+  getCurrentSources(blockNumber: number): ContractSourceConfig[];
   setLastIndexedBlock(blockNum: number);
   insertCheckpoints(checkpoints: { blockNumber: number; contractAddress: string }[]);
   getWriterParams(): Promise<{

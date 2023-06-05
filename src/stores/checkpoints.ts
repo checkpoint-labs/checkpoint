@@ -1,10 +1,12 @@
 import * as crypto from 'crypto';
 import { Knex } from 'knex';
 import { Logger } from '../utils/logger';
+import { TemplateSource } from '../types';
 
 const Table = {
   Checkpoints: '_checkpoints',
-  Metadata: '_metadatas' // using plural names to confirm with standards entities
+  Metadata: '_metadatas', // using plural names to confirm with standards entities
+  TemplateSources: '_template_sources'
 };
 
 const Fields = {
@@ -16,6 +18,12 @@ const Fields = {
   Metadata: {
     Id: 'id',
     Value: 'value'
+  },
+  TemplateSources: {
+    Id: 'id',
+    ContractAddress: 'contract_address',
+    StartBlock: 'start_block',
+    Template: 'template'
   }
 };
 
@@ -74,6 +82,7 @@ export class CheckpointsStore {
 
     const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
+    const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
 
     let builder = this.knex.schema;
 
@@ -90,6 +99,17 @@ export class CheckpointsStore {
         t.string(Fields.Metadata.Id, 20).primary();
         t.string(Fields.Metadata.Value, 128).notNullable();
       });
+    }
+
+    if (!hasTemplateSourcesTable) {
+      builder = builder
+        .dropTableIfExists(Table.TemplateSources)
+        .createTable(Table.TemplateSources, t => {
+          t.increments(Fields.TemplateSources.Id);
+          t.string(Fields.TemplateSources.ContractAddress, 66);
+          t.bigint(Fields.TemplateSources.StartBlock).notNullable();
+          t.string(Fields.TemplateSources.Template, 128).notNullable();
+        });
     }
 
     await builder;
@@ -111,6 +131,7 @@ export class CheckpointsStore {
 
     const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
+    const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
 
     if (hasCheckpointsTable) {
       await this.knex(Table.Checkpoints).truncate();
@@ -118,6 +139,10 @@ export class CheckpointsStore {
 
     if (hasMetadataTable) {
       await this.knex(Table.Metadata).truncate();
+    }
+
+    if (hasTemplateSourcesTable) {
+      await this.knex(Table.TemplateSources).truncate();
     }
 
     this.log.debug('checkpoints tables truncated');
@@ -203,5 +228,33 @@ export class CheckpointsStore {
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
 
     return result.map(value => Number(value[Fields.Checkpoints.BlockNumber]));
+  }
+
+  public async insertTemplateSource(
+    contractAddress: string,
+    startBlock: number,
+    template: string
+  ): Promise<void> {
+    return this.knex.table(Table.TemplateSources).insert({
+      [Fields.TemplateSources.ContractAddress]: contractAddress,
+      [Fields.TemplateSources.StartBlock]: startBlock,
+      [Fields.TemplateSources.Template]: template
+    });
+  }
+
+  public async getTemplateSources(): Promise<TemplateSource[]> {
+    const data = await this.knex
+      .select(
+        Fields.TemplateSources.ContractAddress,
+        Fields.TemplateSources.StartBlock,
+        Fields.TemplateSources.Template
+      )
+      .from(Table.TemplateSources);
+
+    return data.map(row => ({
+      contractAddress: row[Fields.TemplateSources.ContractAddress],
+      startBlock: row[Fields.TemplateSources.StartBlock],
+      template: row[Fields.TemplateSources.Template]
+    }));
   }
 }
