@@ -178,7 +178,7 @@ export default class Checkpoint {
     this.prefetchEndBlock =
       (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
 
-    this.nextEvents(lastPrefetchedBlock);
+    this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
     return await this.next(blockNum);
   }
 
