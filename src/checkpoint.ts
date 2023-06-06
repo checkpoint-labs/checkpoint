@@ -13,6 +13,7 @@ import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
+import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
 import {
   ContractSourceConfig,
@@ -49,6 +50,8 @@ export default class Checkpoint {
     schema: string,
     opts?: CheckpointOptions
   ) {
+    checkpointConfigSchema.parse(config);
+
     this.config = config;
     this.writer = writer;
     this.opts = opts;

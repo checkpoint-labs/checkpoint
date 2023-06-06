@@ -36,7 +36,8 @@
     "pino-pretty": "^8.1.0",
     "pluralize": "^8.0.0",
     "starknet": "^4.13.1",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "zod": "^3.21.4"
   },
   "devDependencies": {
     "@snapshot-labs/eslint-config": "^0.1.0-beta.7",

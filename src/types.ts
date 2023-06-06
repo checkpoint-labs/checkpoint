@@ -1,9 +1,15 @@
+import { z } from 'zod';
 import { Pool as PgPool } from 'pg';
+import { RPC } from 'starknet';
+import Checkpoint from './checkpoint';
 import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
-import type { RPC } from 'starknet';
-import type Checkpoint from './checkpoint';
-import type { BaseProvider } from './providers';
+import { BaseProvider } from './providers';
+import {
+  contractSourceConfigSchema,
+  contractTemplateSchema,
+  checkpointConfigSchema
+} from './schemas';
 
 // Shortcuts to starknet types.
 export type Block = RPC.GetBlockWithTxs;
@@ -45,44 +51,9 @@ export interface CheckpointOptions {
   NetworkProvider?: typeof BaseProvider;
 }
 
-export interface ContractEventConfig {
-  // name of event in the contract
-  name: string;
-  // callback function in writer
-  fn: string;
-}
-
-export interface ContractSourceConfig {
-  // contract address
-  contract: string;
-  // abi name
-  abi?: string;
-  // start block number
-  start: number;
-  // callback function in writer to handle deployment
-  deploy_fn?: string;
-  events: ContractEventConfig[];
-}
-
-export type ContractTemplate = {
-  // abi name
-  abi?: string;
-  events: ContractEventConfig[];
-};
-
-// Configuration used to initialize Checkpoint
-export interface CheckpointConfig {
-  network_node_url: string;
-  optimistic_indexing?: boolean;
-  // Configuration for decimal types
-  // defaults to Decimal(10, 2), BigDecimal(20, 8)
-  decimal_types?: { [key: string]: { p: number; d: number } };
-  start?: number;
-  tx_fn?: string;
-  global_events?: ContractEventConfig[];
-  sources?: ContractSourceConfig[];
-  templates?: { [key: string]: ContractTemplate };
-}
+export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;
+export type ContractTemplate = z.infer<typeof contractTemplateSchema>;
+export type CheckpointConfig = z.infer<typeof checkpointConfigSchema>;
 
 /**
  * Callback function invoked by checkpoint when a contract event
