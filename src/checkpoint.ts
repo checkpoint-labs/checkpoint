@@ -5,6 +5,7 @@ import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
+import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
@@ -17,9 +18,9 @@ import {
   ContractSourceConfig,
   CheckpointConfig,
   CheckpointOptions,
-  CheckpointWriters
+  CheckpointWriters,
+  TemplateSource
 } from './types';
-import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
 
 const DEFAULT_FETCH_INTERVAL = 7000;
 
@@ -38,6 +39,7 @@ export default class Checkpoint {
   private mysqlPool?: AsyncMySqlPool;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
+  private activeTemplates: TemplateSource[] = [];
   private sourceContracts: string[];
   private cpBlocksCache: number[] | null;
 
@@ -128,6 +130,12 @@ export default class Checkpoint {
     return getGraphQL(schema, this.getBaseContext(), this.entityController.generateSampleQuery());
   }
 
+  public getCurrentSources(blockNumber: number) {
+    if (!this.config.sources) return [];
+
+    return this.config.sources.filter(source => source.start <= blockNumber);
+  }
+
   /**
    * Starts the indexer.
    *
@@ -139,6 +147,20 @@ export default class Checkpoint {
     this.log.debug('starting');
 
     await this.validateStore();
+
+    const templateSources = await this.store.getTemplateSources();
+    await Promise.all(
+      templateSources.map(source => {
+        this.executeTemplate(
+          source.template,
+          {
+            contract: source.contractAddress,
+            start: source.startBlock
+          },
+          false
+        );
+      })
+    );
 
     const blockNum = await this.getStartBlockNum();
     return await this.next(blockNum);
@@ -179,7 +201,7 @@ export default class Checkpoint {
     await this.store.resetStore();
   }
 
-  public addSource(source: ContractSourceConfig) {
+  private addSource(source: ContractSourceConfig) {
     if (!this.config.sources) this.config.sources = [];
 
     this.config.sources.push(source);
@@ -187,12 +209,30 @@ export default class Checkpoint {
     this.cpBlocksCache = [];
   }
 
-  public executeTemplate(name: string, { contract, start }: { contract: string; start: number }) {
+  public async executeTemplate(
+    name: string,
+    { contract, start }: { contract: string; start: number },
+    persist = true
+  ) {
     const template = this.config.templates?.[name];
 
     if (!template) {
       this.log.warn({ name }, 'template not found');
       return;
+    }
+
+    const existingTemplate = this.activeTemplates.find(
+      template =>
+        template.template === name &&
+        template.contractAddress === contract &&
+        template.startBlock === start
+    );
+
+    if (existingTemplate) return;
+    this.activeTemplates.push({ template: name, contractAddress: contract, startBlock: start });
+
+    if (persist) {
+      await this.store.insertTemplateSource(contract, start, name);
     }
 
     this.addSource({

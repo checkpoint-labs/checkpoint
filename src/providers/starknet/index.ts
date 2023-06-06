@@ -180,7 +180,7 @@ export class StarknetProvider extends BaseProvider {
       }
     }
 
-    for (const source of this.instance.config.sources || []) {
+    for (const source of this.instance.getCurrentSources(blockNumber)) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
