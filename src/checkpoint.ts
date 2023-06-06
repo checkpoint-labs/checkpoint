@@ -50,7 +50,10 @@ export default class Checkpoint {
     schema: string,
     opts?: CheckpointOptions
   ) {
-    checkpointConfigSchema.parse(config);
+    const validationResult = checkpointConfigSchema.safeParse(config);
+    if (validationResult.success === false) {
+      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
+    }
 
     this.config = config;
     this.writer = writer;
