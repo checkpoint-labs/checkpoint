@@ -30,7 +30,7 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
-import { CheckpointConfig, CheckpointOptions } from '../types';
+import { CheckpointConfig } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
 
 /**
