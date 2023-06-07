@@ -8,7 +8,7 @@ export const contractEventConfigSchema = z.object({
 export const contractSourceConfigSchema = z.object({
   contract: z.string(),
   abi: z.string().optional(),
-  start: z.number(),
+  start: z.number().gte(0),
   deploy_fn: z.string().optional(),
   events: z.array(contractEventConfigSchema)
 });
@@ -19,7 +19,7 @@ export const contractTemplateSchema = z.object({
 });
 
 export const checkpointConfigSchema = z.object({
-  network_node_url: z.string(),
+  network_node_url: z.string().url(),
   optimistic_indexing: z.boolean().optional(),
   decimal_types: z
     .record(
@@ -29,7 +29,7 @@ export const checkpointConfigSchema = z.object({
       })
     )
     .optional(),
-  start: z.number().optional(),
+  start: z.number().gte(0).optional(),
   tx_fn: z.string().optional(),
   global_events: z.array(contractEventConfigSchema).optional(),
   sources: z.array(contractSourceConfigSchema).optional(),
