@@ -178,7 +178,10 @@ export default class Checkpoint {
     this.prefetchEndBlock =
       (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
 
-    this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
+    if (!this.config.disable_checkpoints) {
+      this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
+    }
+
     return await this.next(blockNum);
   }
 
@@ -348,7 +351,7 @@ export default class Checkpoint {
   private async next(blockNum: number) {
     if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
 
-    if (!this.config.tx_fn && !this.config.global_events) {
+    if (!this.config.disable_checkpoints && !this.config.tx_fn && !this.config.global_events) {
       if (blockNum <= this.prefetchEndBlock) {
         const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
 
