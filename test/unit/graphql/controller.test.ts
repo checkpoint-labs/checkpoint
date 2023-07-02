@@ -1,6 +1,10 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
+import pluralize, { plural } from 'pluralize';
+import { table } from 'console';
+import ret from 'bluebird/js/release/util';
+
 
 describe('GqlEntityController', () => {
   describe('generateQueryFields', () => {
@@ -17,7 +21,6 @@ type Vote {
         name: 'Query',
         fields: queryFields
       });
-
       const schema = printSchema(new GraphQLSchema({ query: querySchema }));
       expect(schema).toMatchSnapshot();
     });
@@ -56,7 +59,8 @@ type Vote {
     });
 
     it('should work', async () => {
-      const controller = new GqlEntityController(`
+      let autoIncrementFieldsMap = new Map<string, string[]>();
+      const schema = `
 scalar BigInt
 scalar Decimal
 scalar BigDecimal
@@ -69,10 +73,39 @@ type Vote {
   decimal: Decimal
   big_decimal: BigDecimal
 }
-  `);
-      const { builder } = await controller.createEntityStores(mockKnex);
+  `;
 
-      expect(builder.toString()).toMatchSnapshot();
+      const controller = new GqlEntityController(schema);
+      const { builder } = await controller.createEntityStores(mockKnex, schema);
+
+      const createQuery = builder.toString();
+      console.log("createQuery :" + createQuery);
+      expect(createQuery).toMatchSnapshot();
+    });
+
+
+    it('should work with autoincrement', async () => {
+      const schema = `
+scalar BigInt
+scalar Decimal
+scalar BigDecimal
+
+type Vote {
+  id: Int! @autoIncrement
+  name: String
+  authenticators: [String]
+  big_number: BigInt
+  decimal: Decimal
+  big_decimal: BigDecimal
+}
+  `;
+      const schemaGql = schema.replace(/@autoIncrement/g, '');
+      const controller = new GqlEntityController(schemaGql);
+      const { builder } = await controller.createEntityStores(mockKnex, schema);
+
+      const createQuery = builder.toString();
+      console.log("createQuery :" + createQuery);
+      expect(createQuery).toMatchSnapshot();
     });
   });
 

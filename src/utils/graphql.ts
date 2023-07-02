@@ -79,3 +79,12 @@ export const getNonNullType = (type: GraphQLOutputType): GraphQLOutputType => {
 
   return type;
 };
+
+/**
+ * Gql schema do not manage autoincrement fields. We have to remove the attribute to make schema for gql valid
+ * @param schema 
+ * @returns schema without autoincrement
+ */
+export const ensureGqlCompatibilty = (schema: string): string => {
+  return schema.replace(/@autoIncrement/g, '');
+};

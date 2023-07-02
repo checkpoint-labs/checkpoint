@@ -32,6 +32,7 @@ import {
 } from '../utils/graphql';
 import { CheckpointConfig } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
+import { boolean } from 'yargs';
 
 /**
  * Type for single and multiple query resolvers
@@ -193,9 +194,20 @@ export class GqlEntityController {
    * );
    * ```
    *
+   will execute the following SQL when declaring id as autoincrement:
+   * ```sql
+   * DROP TABLE IF EXISTS votes;
+   * CREATE TABLE votes (
+   *   id integer not null primary key autoincrement,
+   *   name VARCHAR(128),
+   * );
+   * ```
+   * 
    */
-  public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
+  public async createEntityStores(knex: Knex, schema: string): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
+
+    let autoIncrementFieldsMap = this.extractAutoIncrementFields(schema);
 
     if (this.schemaObjects.length === 0) {
       return { builder };
@@ -205,32 +217,63 @@ export class GqlEntityController {
       const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        t.primary(['id']);
+        if (autoIncrementFieldsMap.get(tableName)?.length === 0) {
+          t.primary(['id']);
+        }
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
           if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
-          const sqlType = this.getSqlType(field.type);
+          //Check if field is declared as autoincrement
+          if (autoIncrementFieldsMap.get(tableName)?.includes(field.name)) {
+            t.increments(field.name, { primaryKey: true });
+          } else {
+            const sqlType = this.getSqlType(field.type);
 
-          let column =
-            'options' in sqlType
-              ? t[sqlType.name](field.name, ...sqlType.options)
-              : t[sqlType.name](field.name);
+            let column =
+              'options' in sqlType
+                ? t[sqlType.name](field.name, ...sqlType.options)
+                : t[sqlType.name](field.name);
 
-          if (field.type instanceof GraphQLNonNull) {
-            column = column.notNullable();
+
+
+            if (field.type instanceof GraphQLNonNull) {
+              column = column.notNullable();
+            }
+
+            if (!['text', 'json'].includes(sqlType.name)) {
+              column.index();
+            }
+
           }
 
-          if (!['text', 'json'].includes(sqlType.name)) {
-            column.index();
-          }
         });
       });
     });
 
     await builder;
-
     return { builder };
+  }
+
+  private extractAutoIncrementFields(schema: string) {
+    let autoIncrementFieldsMap = new Map<string, string[]>();
+    const regexTableName = /type\s+(\w+)\s+{/;
+    const regexAutoIncrementField = /(\w+):\s+(Big)?Int!?\s+@autoIncrement/;
+    //const regexAutoIncrementField = /(\w+):\s+(Big)?Int!?\s+@autoIncrement/g;
+    const matchTable = schema.match(regexTableName);
+    if (matchTable && matchTable[1]) {
+      const tableName = pluralize.plural(matchTable[1].toLocaleLowerCase());
+      const listFields = schema.split('\n').map(line => {
+        const matchAutoIncrement = line.match(regexAutoIncrementField);
+        if (matchAutoIncrement && matchAutoIncrement[1]) {
+          return matchAutoIncrement[1];
+        }
+      }).filter(line => line !== undefined) as string[];
+      if (listFields) {
+        autoIncrementFieldsMap.set(tableName, listFields);
+      }
+    }
+    return autoIncrementFieldsMap;
   }
 
   /**

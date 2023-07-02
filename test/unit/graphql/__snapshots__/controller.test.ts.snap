@@ -16,6 +16,15 @@ create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
 create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 `;
 
+exports[`GqlEntityController createEntityStores should work with autoincrement 1`] = `
+"drop table if exists \`votes\`;
+create table \`votes\` (\`id\` integer not null primary key autoincrement, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float);
+create index \`votes_name_index\` on \`votes\` (\`name\`);
+create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
+create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
+create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
+`;
+
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!): Vote
