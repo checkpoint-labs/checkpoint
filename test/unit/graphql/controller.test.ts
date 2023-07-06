@@ -1,7 +1,6 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
-import ret from 'bluebird/js/release/util';
 import { autoIncrementTag } from '../../../src/types';
 
 const regex = new RegExp(autoIncrementTag.source, 'g');
@@ -105,7 +104,7 @@ type Vote {
       expect(createQuery).toMatchSnapshot();
     });
 
-    it('should work with autoincrement with nested objects', async () => {
+    it('should work with autoincrement and nested objects', async () => {
       const schema = `
 scalar BigInt
 scalar Decimal

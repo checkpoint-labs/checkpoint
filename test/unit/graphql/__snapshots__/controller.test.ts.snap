@@ -25,7 +25,7 @@ create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
 create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 `;
 
-exports[`GqlEntityController createEntityStores should work with autoincrement with nested objects 1`] = `
+exports[`GqlEntityController createEntityStores should work with autoincrement and nested objects 1`] = `
 "drop table if exists \`votes\`;
 create table \`votes\` (\`id\` integer not null primary key autoincrement, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, \`poster\` varchar(128));
 create index \`votes_name_index\` on \`votes\` (\`name\`);
