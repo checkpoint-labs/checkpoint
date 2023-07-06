@@ -8,6 +8,7 @@ import {
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
+import { autoIncrementTag } from '../types';
 
 export const extendSchema = (schema: string): string => {
   return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
@@ -82,9 +83,9 @@ export const getNonNullType = (type: GraphQLOutputType): GraphQLOutputType => {
 
 /**
  * Gql schema do not manage autoincrement fields. We have to remove the attribute to make schema for gql valid
- * @param schema 
- * @returns schema without autoincrement
+ * @param schema
+ * @returns schema without autoincrement annotation
  */
 export const ensureGqlCompatibilty = (schema: string): string => {
-  return schema.replace(/@autoIncrement/g, '');
+  return schema.replace(new RegExp(autoIncrementTag.source, 'g'), '');
 };

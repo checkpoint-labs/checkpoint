@@ -1,10 +1,10 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
-import pluralize, { plural } from 'pluralize';
-import { table } from 'console';
 import ret from 'bluebird/js/release/util';
+import { autoIncrementTag } from '../../../src/types';
 
+const regex = new RegExp(autoIncrementTag.source, 'g');
 
 describe('GqlEntityController', () => {
   describe('generateQueryFields', () => {
@@ -59,7 +59,6 @@ type Vote {
     });
 
     it('should work', async () => {
-      let autoIncrementFieldsMap = new Map<string, string[]>();
       const schema = `
 scalar BigInt
 scalar Decimal
@@ -79,10 +78,8 @@ type Vote {
       const { builder } = await controller.createEntityStores(mockKnex, schema);
 
       const createQuery = builder.toString();
-      console.log("createQuery :" + createQuery);
       expect(createQuery).toMatchSnapshot();
     });
-
 
     it('should work with autoincrement', async () => {
       const schema = `
@@ -98,13 +95,43 @@ type Vote {
   decimal: Decimal
   big_decimal: BigDecimal
 }
+
   `;
-      const schemaGql = schema.replace(/@autoIncrement/g, '');
+
+      const schemaGql = schema.replace(regex, '');
       const controller = new GqlEntityController(schemaGql);
       const { builder } = await controller.createEntityStores(mockKnex, schema);
-
       const createQuery = builder.toString();
-      console.log("createQuery :" + createQuery);
+      expect(createQuery).toMatchSnapshot();
+    });
+
+    it('should work with autoincrement with nested objects', async () => {
+      const schema = `
+scalar BigInt
+scalar Decimal
+scalar BigDecimal
+
+type Vote {
+  id: Int! @autoIncrement
+  name: String
+  authenticators: [String]
+  big_number: BigInt
+  decimal: Decimal
+  big_decimal: BigDecimal
+  poster : Poster
+}
+
+type Poster {
+  id: ID! @autoIncrement
+  name: String!
+}
+
+  `;
+
+      const schemaGql = schema.replace(new RegExp(autoIncrementTag.source, 'g'), '');
+      const controller = new GqlEntityController(schemaGql);
+      const { builder } = await controller.createEntityStores(mockKnex, schema);
+      const createQuery = builder.toString();
       expect(createQuery).toMatchSnapshot();
     });
   });

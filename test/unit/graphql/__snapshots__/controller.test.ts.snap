@@ -25,6 +25,19 @@ create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
 create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 `;
 
+exports[`GqlEntityController createEntityStores should work with autoincrement with nested objects 1`] = `
+"drop table if exists \`votes\`;
+create table \`votes\` (\`id\` integer not null primary key autoincrement, \`name\` varchar(128), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, \`poster\` varchar(128));
+create index \`votes_name_index\` on \`votes\` (\`name\`);
+create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
+create index \`votes_decimal_index\` on \`votes\` (\`decimal\`);
+create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`);
+create index \`votes_poster_index\` on \`votes\` (\`poster\`);
+drop table if exists \`posters\`;
+create table \`posters\` (\`id\` integer not null primary key autoincrement, \`name\` varchar(128) not null);
+create index \`posters_name_index\` on \`posters\` (\`name\`)"
+`;
+
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!): Vote

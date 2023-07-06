@@ -30,9 +30,8 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
-import { CheckpointConfig } from '../types';
+import { autoIncrementFieldPattern, CheckpointConfig, tableNamePattern } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
-import { boolean } from 'yargs';
 
 /**
  * Type for single and multiple query resolvers
@@ -204,10 +203,13 @@ export class GqlEntityController {
    * ```
    * 
    */
-  public async createEntityStores(knex: Knex, schema: string): Promise<{ builder: Knex.SchemaBuilder }> {
+  public async createEntityStores(
+    knex: Knex,
+    schema: string
+  ): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
-    let autoIncrementFieldsMap = this.extractAutoIncrementFields(schema);
+    const autoIncrementFieldsMap = this.extractAutoIncrementFields(schema);
 
     if (this.schemaObjects.length === 0) {
       return { builder };
@@ -217,7 +219,11 @@ export class GqlEntityController {
       const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        if (autoIncrementFieldsMap.get(tableName)?.length === 0) {
+        //if there is no autoIncrement fields on current table, mark the id as primary
+        if (
+          autoIncrementFieldsMap.size == 0 ||
+          autoIncrementFieldsMap.get(tableName)?.length === 0
+        ) {
           t.primary(['id']);
         }
 
@@ -229,13 +235,10 @@ export class GqlEntityController {
             t.increments(field.name, { primaryKey: true });
           } else {
             const sqlType = this.getSqlType(field.type);
-
             let column =
               'options' in sqlType
                 ? t[sqlType.name](field.name, ...sqlType.options)
                 : t[sqlType.name](field.name);
-
-
 
             if (field.type instanceof GraphQLNonNull) {
               column = column.notNullable();
@@ -244,9 +247,7 @@ export class GqlEntityController {
             if (!['text', 'json'].includes(sqlType.name)) {
               column.index();
             }
-
           }
-
         });
       });
     });
@@ -255,24 +256,39 @@ export class GqlEntityController {
     return { builder };
   }
 
+  /**
+   * Parse schema to extract table and fields witrh annotation autoIncrement
+   * @param schema
+   * @returns A map where key is table name and values a list of fields with annotation autoIncrement
+   */
   private extractAutoIncrementFields(schema: string) {
-    let autoIncrementFieldsMap = new Map<string, string[]>();
-    const regexTableName = /type\s+(\w+)\s+{/;
-    const regexAutoIncrementField = /(\w+):\s+(Big)?Int!?\s+@autoIncrement/;
-    //const regexAutoIncrementField = /(\w+):\s+(Big)?Int!?\s+@autoIncrement/g;
-    const matchTable = schema.match(regexTableName);
-    if (matchTable && matchTable[1]) {
-      const tableName = pluralize.plural(matchTable[1].toLocaleLowerCase());
-      const listFields = schema.split('\n').map(line => {
-        const matchAutoIncrement = line.match(regexAutoIncrementField);
-        if (matchAutoIncrement && matchAutoIncrement[1]) {
-          return matchAutoIncrement[1];
+    const autoIncrementFieldsMap = new Map<string, string[]>();
+    let currentTable = '';
+
+    schema.split('\n').forEach(line => {
+      const matchTable = line.match(tableNamePattern);
+      //check for current table name
+      if (matchTable && matchTable[1]) {
+        const tableName = pluralize.plural(matchTable[1].toLocaleLowerCase());
+        if (tableName !== currentTable) {
+          currentTable = tableName;
         }
-      }).filter(line => line !== undefined) as string[];
-      if (listFields) {
-        autoIncrementFieldsMap.set(tableName, listFields);
+      } else {
+        //check for fields
+        const matchAutoIncrement = line.match(autoIncrementFieldPattern());
+        if (matchAutoIncrement && matchAutoIncrement[1]) {
+          const field = matchAutoIncrement[1];
+          // Check if the key already exists in the map
+          if (autoIncrementFieldsMap.has(currentTable)) {
+            const existingFields = autoIncrementFieldsMap.get(currentTable);
+            existingFields?.push(field);
+          } else {
+            autoIncrementFieldsMap.set(currentTable, [field]);
+          }
+        }
       }
-    }
+    });
+
     return autoIncrementFieldsMap;
   }
 
