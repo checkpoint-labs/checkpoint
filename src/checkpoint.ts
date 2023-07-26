@@ -9,7 +9,7 @@ import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpo
 import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
-import { ensureGqlCompatibilty, extendSchema } from './utils/graphql';
+import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
@@ -29,8 +29,7 @@ export default class Checkpoint {
   public config: CheckpointConfig;
   public writer: CheckpointWriters;
   public opts?: CheckpointOptions;
-  public schemaCustom: string;
-  public schemaGql: string;
+  public schema: string;
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
@@ -48,7 +47,7 @@ export default class Checkpoint {
   constructor(
     config: CheckpointConfig,
     writer: CheckpointWriters,
-    schemaCustom: string,
+    schema: string,
     opts?: CheckpointOptions
   ) {
     const validationResult = checkpointConfigSchema.safeParse(config);
@@ -59,12 +58,11 @@ export default class Checkpoint {
     this.config = config;
     this.writer = writer;
     this.opts = opts;
-    this.schemaCustom = extendSchema(schemaCustom);
-    this.schemaGql = ensureGqlCompatibilty(schemaCustom);
+    this.schema = extendSchema(schema);
 
     this.validateConfig();
 
-    this.entityController = new GqlEntityController(this.schemaGql, config);
+    this.entityController = new GqlEntityController(this.schema, config);
 
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
@@ -193,7 +191,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
-    await this.entityController.createEntityStores(this.knex, this.schemaCustom);
+    await this.entityController.createEntityStores(this.knex, this.schema);
   }
 
   /**

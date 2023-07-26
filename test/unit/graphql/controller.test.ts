@@ -1,9 +1,7 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
-import { autoIncrementTag } from '../../../src/types';
-
-const regex = new RegExp(autoIncrementTag.source, 'g');
+import { extendSchema } from '../../../src/utils/graphql';
 
 describe('GqlEntityController', () => {
   describe('generateQueryFields', () => {
@@ -81,7 +79,7 @@ type Vote {
     });
 
     it('should work with autoincrement', async () => {
-      const schema = `
+      let schema = `
 scalar BigInt
 scalar Decimal
 scalar BigDecimal
@@ -97,15 +95,15 @@ type Vote {
 
   `;
 
-      const schemaGql = schema.replace(regex, '');
-      const controller = new GqlEntityController(schemaGql);
+      schema = extendSchema(schema);
+      const controller = new GqlEntityController(schema);
       const { builder } = await controller.createEntityStores(mockKnex, schema);
       const createQuery = builder.toString();
       expect(createQuery).toMatchSnapshot();
     });
 
     it('should work with autoincrement and nested objects', async () => {
-      const schema = `
+      let schema = `
 scalar BigInt
 scalar Decimal
 scalar BigDecimal
@@ -127,8 +125,8 @@ type Poster {
 
   `;
 
-      const schemaGql = schema.replace(new RegExp(autoIncrementTag.source, 'g'), '');
-      const controller = new GqlEntityController(schemaGql);
+      schema = extendSchema(schema);
+      const controller = new GqlEntityController(schema);
       const { builder } = await controller.createEntityStores(mockKnex, schema);
       const createQuery = builder.toString();
       expect(createQuery).toMatchSnapshot();
