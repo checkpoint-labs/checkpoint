@@ -1,7 +1,6 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
 import { BaseProvider, BlockNotFoundError } from '../base';
 import { parseEvent } from './utils';
-import type { Abi } from 'starknet';
 import { isFullBlock, isDeployTransaction } from '../../types';
 import type {
   Block,
@@ -153,7 +152,7 @@ export class StarknetProvider extends BaseProvider {
 
     if (this.instance.config.global_events) {
       const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
-        handlers[`0x${hash.starknetKeccak(event.name).toString('hex')}`] = {
+        handlers[`0x${hash.starknetKeccak(event.name).toString(16)}`] = {
           name: event.name,
           fn: event.fn
         };
@@ -207,7 +206,7 @@ export class StarknetProvider extends BaseProvider {
       for (const [eventIndex, event] of events.entries()) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
-            if (`0x${hash.starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
+            if (`0x${hash.starknetKeccak(sourceEvent.name).toString(16)}` === event.keys[0]) {
               foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
@@ -217,11 +216,7 @@ export class StarknetProvider extends BaseProvider {
               let parsedEvent: ParsedEvent | undefined;
               if (source.abi && this.abis?.[source.abi]) {
                 try {
-                  parsedEvent = parseEvent(
-                    this.abis?.[source.abi] as Abi,
-                    sourceEvent.name,
-                    event.data
-                  );
+                  parsedEvent = parseEvent(this.abis[source.abi], event);
                 } catch (err) {
                   this.log.warn(
                     { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
