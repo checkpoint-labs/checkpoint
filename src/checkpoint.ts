@@ -156,7 +156,7 @@ export default class Checkpoint {
 
     const templateSources = await this.store.getTemplateSources();
     await Promise.all(
-      templateSources.map(source => {
+      templateSources.map(source =>
         this.executeTemplate(
           source.template,
           {
@@ -164,8 +164,8 @@ export default class Checkpoint {
             start: source.startBlock
           },
           false
-        );
-      })
+        )
+      )
     );
 
     const blockNum = await this.getStartBlockNum();

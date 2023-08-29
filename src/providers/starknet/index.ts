@@ -9,7 +9,8 @@ import type {
   PendingTransaction,
   Event,
   EventsMap,
-  ParsedEvent
+  ParsedEvent,
+  ContractSourceConfig
 } from '../../types';
 
 export class StarknetProvider extends BaseProvider {
@@ -179,7 +180,11 @@ export class StarknetProvider extends BaseProvider {
       }
     }
 
-    for (const source of this.instance.getCurrentSources(blockNumber)) {
+    let lastSources = this.instance.getCurrentSources(blockNumber);
+    const sourcesQueue = [...lastSources];
+
+    let source: ContractSourceConfig | undefined;
+    while ((source = sourcesQueue.shift())) {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
@@ -243,6 +248,14 @@ export class StarknetProvider extends BaseProvider {
       if (foundContractData) {
         await this.instance.insertCheckpoints([{ blockNumber, contractAddress: source.contract }]);
       }
+
+      const nextSources = this.instance.getCurrentSources(blockNumber);
+      const newSources = nextSources.filter(
+        nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
+      );
+
+      sourcesQueue.push(...newSources);
+      lastSources = nextSources;
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
