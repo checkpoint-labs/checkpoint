@@ -1,26 +1,32 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`utils parseEvent should parse cairo 1 event 1`] = `
+{
+  "class_hash": "0x7b52be32f53235445c94247942b516cb9f8ace110c82ca8a72af527eb7d44b0",
+  "space_address": "0x40279a6371314c37464ebc327856a2d332b89022109f55b9ee93179bbbe727a",
+}
+`;
+
 exports[`utils parseEvent should parse event 1`] = `
 {
   "authenticators": [
-    "0x64cce9272197eba6353f5bbf060e097e516b411e66e83a9cf5910a08697df14",
-    "0x4112e7aef90c47058238ccb76bf79ad5188afdf366870015185e3c7468ccbd9",
-    "0x68a2d3c6d882ec0e2e94042556878d27e832a28e1308df04ad35fd8bae9ec6b",
-    "0x64bb9fd620d7e4c5f5895329e8f1d3d5f485ccfb2b16345a1ca86658f24c9f6",
-    "0x59283b509832027a386b3f419628a5b149e9d6462a6547c63e92bd4a09a7245",
     "0x5e1f273ca9a11f78bfb291cbe1b49294cf3c76dd48951e7ab7db6d9fb1e7d62",
+    "0x64cce9272197eba6353f5bbf060e097e516b411e66e83a9cf5910a08697df14",
   ],
-  "authenticators_len": "0x6",
-  "controller": "0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6",
-  "deployer_address": "0x77d5345916a48b88ad002ead40344edbaa3a900d66c40d0b8e0c4c9f529d9a6",
+  "authenticators_len": "0x2",
+  "controller": "0x6abd599ab530c5b3bc603111bdd20d77890db330402dc870fc9866f50ed6d2a",
+  "deployer_address": "0x6abd599ab530c5b3bc603111bdd20d77890db330402dc870fc9866f50ed6d2a",
   "execution_strategies": [
     "0x4ecc83848a519cc22b0d0ffb70e65ec8dde85d3d13439eff7145d4063cf6b4d",
-    "0x21dda40770f4317582251cffd5a0202d6b223dc167e5c8db25dc887d11eba81",
   ],
-  "execution_strategies_len": "0x2",
+  "execution_strategies_len": "0x1",
   "max_voting_duration": "0x15180",
-  "metadata_uri": undefined,
-  "metadata_uri_len": "0x0",
+  "metadata_uri": [
+    "0x697066733a2f2f6261666b726569617978776969726337666e6b7461796d62",
+    "0x34367363356162767a6f6c6f6864343666717a6d71616b6e6f337467716c36",
+    "0x32686669",
+  ],
+  "metadata_uri_len": "0x3",
   "min_voting_duration": "0x0",
   "proposal_threshold": {
     "high": "0x0",
@@ -30,32 +36,34 @@ exports[`utils parseEvent should parse event 1`] = `
     "high": "0x0",
     "low": "0x1",
   },
-  "space_address": "0x3993631a1336a81c474e2cf5ebbb3e820547ad14e6f6a7afcdac9d35eaccac5",
+  "space_address": "0x56ecf84acc36d7d878ab11067c2e9870a38f10d0819c698f8c1f559c40d3a",
   "voting_delay": "0x0",
   "voting_strategies": [
-    "0x58623786b93d9b6ed1f83cec5c6fa6bea5f399d2795ee56a6123bdd83f5aa48",
+    "0xd1b81feff3095ca9517fdfc7427e742ce96f7ca8f3b2664a21b2fba552493b",
     "0xd1b81feff3095ca9517fdfc7427e742ce96f7ca8f3b2664a21b2fba552493b",
   ],
   "voting_strategies_len": "0x2",
   "voting_strategy_params_flat": [
     "0x2",
     "0x0",
-    "0x0",
-    "0xb4fbf271143f5000000000000000000000000000",
+    "0x2",
+    "0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    "0x3",
+    "0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6",
     "0x3",
   ],
-  "voting_strategy_params_flat_len": "0x5",
+  "voting_strategy_params_flat_len": "0x7",
 }
 `;
 
 exports[`utils parseEvent should parse nested event 1`] = `
 {
-  "proposal_id": "0xf",
+  "proposal_id": "0x8",
   "vote": {
     "choice": "0x1",
     "voting_power": {
       "high": "0x0",
-      "low": "0x23cdb7dc255bf4da",
+      "low": "0x1",
     },
   },
   "voter_address": {
