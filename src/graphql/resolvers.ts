@@ -74,7 +74,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
         const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
 
         const fields = Object.values(nestedReturnType.getFields())
-          .filter(field => isScalarType(field.type))
+          .filter(field => isScalarType(getNonNullType(field.type)))
           .map(field => field.name);
 
         nestedEntitiesMappings[fieldName] = {
