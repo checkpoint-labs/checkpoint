@@ -90,7 +90,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 
         handleWhere(query, nestedTableName, w[1]);
       } else {
-        query = query.where(w[0], w[1]);
+        query = query.where(`${prefix}.${w[0]}`, w[1]);
       }
     });
   };
