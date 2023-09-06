@@ -49,6 +49,15 @@ const GraphQLOrderDirection = new GraphQLEnumType({
   }
 });
 
+type WhereResult = {
+  where: {
+    type: GraphQLInputObjectType;
+  };
+  orderByValues: Record<string, { value: string }>;
+};
+
+const cache = new Map<string, WhereResult>();
+
 /**
  * Controller for performing actions based on the graphql schema provided to its
  * constructor. It exposes public functions to generate graphql or database
@@ -297,78 +306,96 @@ export class GqlEntityController {
     type: GraphQLObjectType,
     resolver: GraphQLFieldResolver<Parent, Context>
   ): GraphQLFieldConfig<Parent, Context> {
-    const whereInputConfig: GraphQLInputObjectTypeConfig = {
-      name: `Where${type.name}`,
-      fields: {}
-    };
+    const getWhereType = (type: GraphQLObjectType<any, any>): WhereResult => {
+      const name = `${type.name}_filter`;
 
-    const orderByValues = {};
+      const cachedValue = cache.get(name);
+      if (cachedValue) return cachedValue;
 
-    this.getTypeFields(type).forEach(field => {
-      // all field types in a where input variable must be optional
-      // so we try to extract the non null type here.
-      let nonNullFieldType = getNonNullType(field.type);
+      const orderByValues = {};
+      const whereInputConfig: GraphQLInputObjectTypeConfig = {
+        name,
+        fields: {}
+      };
 
-      if (nonNullFieldType instanceof GraphQLObjectType) {
-        const fields = type.getFields();
-        const idField = fields['id'];
+      this.getTypeFields(type).forEach(field => {
+        // all field types in a where input variable must be optional
+        // so we try to extract the non null type here.
+        let nonNullFieldType = getNonNullType(field.type);
+
+        if (nonNullFieldType instanceof GraphQLObjectType) {
+          const fields = type.getFields();
+          const idField = fields['id'];
+
+          if (
+            idField &&
+            idField.type instanceof GraphQLNonNull &&
+            idField.type.ofType instanceof GraphQLScalarType &&
+            ['String', 'ID'].includes(idField.type.ofType.name)
+          ) {
+            whereInputConfig.fields[`${field.name}_`] = getWhereType(nonNullFieldType).where;
+
+            nonNullFieldType = getNonNullType(idField.type);
+          }
+        }
+
+        // avoid setting up where filters for non scalar types
+        if (!isLeafType(nonNullFieldType)) {
+          return;
+        }
+
+        if (nonNullFieldType === GraphQLInt) {
+          whereInputConfig.fields[`${field.name}_gt`] = { type: GraphQLInt };
+          whereInputConfig.fields[`${field.name}_gte`] = { type: GraphQLInt };
+          whereInputConfig.fields[`${field.name}_lt`] = { type: GraphQLInt };
+          whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
+        }
 
         if (
-          idField &&
-          idField.type instanceof GraphQLNonNull &&
-          idField.type.ofType instanceof GraphQLScalarType &&
-          ['String', 'ID'].includes(idField.type.ofType.name)
+          (nonNullFieldType instanceof GraphQLScalarType && nonNullFieldType.name === 'BigInt') ||
+          this.decimalTypes[nonNullFieldType.name]
         ) {
-          nonNullFieldType = getNonNullType(idField.type);
+          whereInputConfig.fields[`${field.name}_gt`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_gte`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_lt`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_lte`] = { type: nonNullFieldType };
         }
-      }
 
-      // avoid setting up where filters for non scalar types
-      if (!isLeafType(nonNullFieldType)) {
-        return;
-      }
+        if (
+          nonNullFieldType === GraphQLString ||
+          (nonNullFieldType as GraphQLScalarType).name === 'Text'
+        ) {
+          whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
+          whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
+          whereInputConfig.fields[`${field.name}_contains_nocase`] = { type: GraphQLString };
+          whereInputConfig.fields[`${field.name}_not_contains_nocase`] = { type: GraphQLString };
+        }
 
-      if (nonNullFieldType === GraphQLInt) {
-        whereInputConfig.fields[`${field.name}_gt`] = { type: GraphQLInt };
-        whereInputConfig.fields[`${field.name}_gte`] = { type: GraphQLInt };
-        whereInputConfig.fields[`${field.name}_lt`] = { type: GraphQLInt };
-        whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
-      }
+        if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
+          whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_in`] = {
+            type: new GraphQLList(nonNullFieldType)
+          };
+          whereInputConfig.fields[`${field.name}_not_in`] = {
+            type: new GraphQLList(nonNullFieldType)
+          };
+        }
 
-      if (
-        (nonNullFieldType instanceof GraphQLScalarType && nonNullFieldType.name === 'BigInt') ||
-        this.decimalTypes[nonNullFieldType.name]
-      ) {
-        whereInputConfig.fields[`${field.name}_gt`] = { type: nonNullFieldType };
-        whereInputConfig.fields[`${field.name}_gte`] = { type: nonNullFieldType };
-        whereInputConfig.fields[`${field.name}_lt`] = { type: nonNullFieldType };
-        whereInputConfig.fields[`${field.name}_lte`] = { type: nonNullFieldType };
-      }
+        orderByValues[field.name] = { value: field.name };
+      });
 
-      if (
-        nonNullFieldType === GraphQLString ||
-        (nonNullFieldType as GraphQLScalarType).name === 'Text'
-      ) {
-        whereInputConfig.fields[`${field.name}_contains`] = { type: GraphQLString };
-        whereInputConfig.fields[`${field.name}_not_contains`] = { type: GraphQLString };
-        whereInputConfig.fields[`${field.name}_contains_nocase`] = { type: GraphQLString };
-        whereInputConfig.fields[`${field.name}_not_contains_nocase`] = { type: GraphQLString };
-      }
+      const result = {
+        where: { type: new GraphQLInputObjectType(whereInputConfig) },
+        orderByValues
+      };
 
-      if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
-        whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
-        whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
-        whereInputConfig.fields[`${field.name}_in`] = {
-          type: new GraphQLList(nonNullFieldType)
-        };
-        whereInputConfig.fields[`${field.name}_not_in`] = {
-          type: new GraphQLList(nonNullFieldType)
-        };
-      }
+      cache.set(name, result);
 
-      // add fields to orderBy enum
-      orderByValues[field.name] = { value: field.name };
-    });
+      return result;
+    };
+
+    const { where, orderByValues } = getWhereType(type);
 
     const OrderByEnum = new GraphQLEnumType({
       name: `OrderBy${type.name}Fields`,
@@ -390,7 +417,7 @@ export class GqlEntityController {
         orderDirection: {
           type: GraphQLOrderDirection
         },
-        where: { type: new GraphQLInputObjectType(whereInputConfig) }
+        where
       },
       resolve: resolver
     };

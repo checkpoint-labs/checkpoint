@@ -5,7 +5,8 @@ import {
   GraphQLObjectType,
   GraphQLResolveInfo,
   GraphQLScalarType,
-  isListType
+  isListType,
+  isScalarType
 } from 'graphql';
 import {
   parseResolveInfo,
@@ -38,38 +39,64 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 
   const tableName = getTableName(returnType.name.toLowerCase());
 
-  let query = knex.select('*').from(tableName);
+  const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
-  if (args.where) {
-    Object.entries(args.where).map((w: [string, any]) => {
-      // TODO: we could generate args.where as objects { name, column, operator, value }
+  let query = knex.select(`${tableName}.*`).from(tableName);
+  const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
+    Object.entries(where).map((w: [string, any]) => {
+      // TODO: we could generate where as objects { name, column, operator, value }
       // so we don't have to cut it there
       if (w[0].endsWith('_not')) {
-        query = query.where(w[0].slice(0, -4), '!=', w[1]);
+        query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '!=', w[1]);
       } else if (w[0].endsWith('_gt')) {
-        query = query.where(w[0].slice(0, -3), '>', w[1]);
+        query = query.where(`${prefix}.${w[0].slice(0, -3)}`, '>', w[1]);
       } else if (w[0].endsWith('_gte')) {
-        query = query.where(w[0].slice(0, -4), '>=', w[1]);
+        query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '>=', w[1]);
       } else if (w[0].endsWith('_lt')) {
-        query = query.where(w[0].slice(0, -3), '<', w[1]);
+        query = query.where(`${prefix}.${w[0].slice(0, -3)}`, '<', w[1]);
       } else if (w[0].endsWith('_lte')) {
-        query = query.where(w[0].slice(0, -4), '<=', w[1]);
+        query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '<=', w[1]);
       } else if (w[0].endsWith('_not_contains')) {
-        query = query.not.whereLike(w[0].slice(0, -13), `%${w[1]}%`);
+        query = query.not.whereLike(`${prefix}.${w[0].slice(0, -13)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_not_contains_nocase')) {
-        query = query.not.whereILike(w[0].slice(0, -20), `%${w[1]}%`);
+        query = query.not.whereILike(`${prefix}.${w[0].slice(0, -20)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_contains')) {
-        query = query.whereLike(w[0].slice(0, -9), `%${w[1]}%`);
+        query = query.whereLike(`${prefix}.${w[0].slice(0, -9)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_contains_nocase')) {
-        query = query.whereILike(w[0].slice(0, -16), `%${w[1]}%`);
+        query = query.whereILike(`${prefix}.${w[0].slice(0, -16)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_not_in')) {
-        query = query.not.whereIn(w[0].slice(0, -7), w[1]);
+        query = query.not.whereIn(`${prefix}.${w[0].slice(0, -7)}`, w[1]);
       } else if (w[0].endsWith('_in')) {
-        query = query.whereIn(w[0].slice(0, -3), w[1] as any);
+        query = query.whereIn(`${prefix}.${w[0].slice(0, -3)}`, w[1]);
+      } else if (typeof w[1] === 'object' && w[0].endsWith('_')) {
+        const fieldName = w[0].slice(0, -1);
+        const nestedReturnType = returnType.getFields()[fieldName].type as GraphQLObjectType;
+        const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
+
+        const fields = Object.values(nestedReturnType.getFields())
+          .filter(field => isScalarType(getNonNullType(field.type)))
+          .map(field => field.name);
+
+        nestedEntitiesMappings[fieldName] = {
+          [`${fieldName}.id`]: `${nestedTableName}.id`,
+          ...Object.fromEntries(
+            fields.map(field => [`${fieldName}.${field}`, `${nestedTableName}.${field}`])
+          )
+        };
+
+        query = query
+          .columns(nestedEntitiesMappings[fieldName])
+          .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
+
+        handleWhere(query, nestedTableName, w[1]);
       } else {
-        query = query.where(w[0], w[1]);
+        query = query.where(`${prefix}.${w[0]}`, w[1]);
       }
     });
+  };
+
+  if (args.where) {
+    handleWhere(query, tableName, args.where);
   }
 
   if (args.orderBy) {
@@ -80,7 +107,28 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   log.debug({ sql: query.toQuery(), args }, 'executing multi query');
 
   const result = await query;
-  return result.map(item => formatItem(item, jsonFields));
+  return result.map(item => {
+    const nested = Object.fromEntries(
+      Object.entries(nestedEntitiesMappings).map(([fieldName, mapping]) => {
+        return [
+          fieldName,
+          Object.fromEntries(
+            Object.entries(mapping).map(([to, from]) => {
+              const exploded = from.split('.');
+              const key = exploded[exploded.length - 1];
+
+              return [key, item[to]];
+            })
+          )
+        ];
+      })
+    );
+
+    return {
+      ...formatItem(item, jsonFields),
+      ...nested
+    };
+  });
 }
 
 export async function querySingle(
@@ -92,7 +140,14 @@ export async function querySingle(
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
-  const id = parent?.[info.fieldName] || args.id;
+  const currentValue = parent?.[info.fieldName];
+
+  const alreadyResolvedInParent = typeof currentValue === 'object';
+  if (alreadyResolvedInParent) {
+    return formatItem(currentValue, jsonFields);
+  }
+
+  const id = currentValue || args.id;
 
   const parsed = parseResolveInfo(info);
   if (parsed) {
