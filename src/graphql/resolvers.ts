@@ -194,9 +194,11 @@ export const getNestedResolver = (columnName: string) =>
   };
 
 function getJsonFields(type: GraphQLObjectType) {
-  return Object.values(type.getFields()).filter(
-    field => isListType(field.type) && field.type.ofType instanceof GraphQLScalarType
-  );
+  return Object.values(type.getFields()).filter(field => {
+    const baseType = getNonNullType(field.type);
+
+    return isListType(baseType) && baseType.ofType instanceof GraphQLScalarType;
+  });
 }
 
 function formatItem(item: Record<string, any>, jsonFields: GraphQLField<any, any>[]) {
