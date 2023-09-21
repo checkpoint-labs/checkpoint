@@ -462,7 +462,7 @@ export class GqlEntityController {
         return { name: 'float', options: [23] };
       case GraphQLString:
       case GraphQLID:
-        return { name: 'string', options: [128] };
+        return { name: 'string', options: [256] };
     }
 
     if (type instanceof GraphQLObjectType) {
@@ -475,7 +475,7 @@ export class GqlEntityController {
         idField.type.ofType instanceof GraphQLScalarType &&
         ['String', 'ID'].includes(idField.type.ofType.name)
       ) {
-        return { name: 'string', options: [128] };
+        return { name: 'string', options: [256] };
       }
     }
 
