@@ -131,9 +131,25 @@ export const codegen = (
     contents += `export class ${modelName} extends Model {\n`;
     contents += `  static tableName = '${pluralize(modelName.toLowerCase())}';\n\n`;
 
-    contents += format === 'javascript' ? `  constructor(id) {\n` : `  constructor(id: string) {\n`;
+    const typeFields = controller.getTypeFields(type);
+    const idField = typeFields.find(field => field.name === 'id');
+    const idType = idField ? getJSType(idField, decimalTypes) : null;
+
+    if (
+      !idType ||
+      !['string', 'number'].includes(idType.baseType) ||
+      idType.isNullable ||
+      idType.isList
+    ) {
+      throw new Error(`Model ${modelName} must have an id field of type string or number`);
+    }
+
+    contents +=
+      format === 'javascript'
+        ? `  constructor(id) {\n`
+        : `  constructor(id: ${idType.baseType}) {\n`;
     contents += `    super(${modelName}.tableName);\n\n`;
-    controller.getTypeFields(type).forEach(field => {
+    typeFields.forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) {
         return;
@@ -148,8 +164,8 @@ export const codegen = (
     contents +=
       format === 'javascript'
         ? `  static async loadEntity(id) {\n`
-        : `  static async loadEntity(id: string): Promise<${modelName} | null> {\n`;
-    contents += `    const entity = await super.loadEntity(${modelName}.tableName, id);\n`;
+        : `  static async loadEntity(id: ${idType.baseType}): Promise<${modelName} | null> {\n`;
+    contents += `    const entity = await super._loadEntity(${modelName}.tableName, id);\n`;
     contents += `    if (!entity) return null;\n\n`;
     contents += `    const model = new ${modelName}(id);\n`;
     contents += `    model.setExists();\n\n`;
@@ -159,7 +175,7 @@ export const codegen = (
     contents += `    return model;\n`;
     contents += `  }\n\n`;
 
-    controller.getTypeFields(type).forEach(field => {
+    typeFields.forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) {
         return;

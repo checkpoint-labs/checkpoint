@@ -21,7 +21,7 @@ export class Space extends Model {
   }
 
   static async loadEntity(id) {
-    const entity = await super.loadEntity(Space.tableName, id);
+    const entity = await super._loadEntity(Space.tableName, id);
     if (!entity) return null;
 
     const model = new Space(id);
@@ -123,7 +123,7 @@ export class Proposal extends Model {
   }
 
   static async loadEntity(id) {
-    const entity = await super.loadEntity(Proposal.tableName, id);
+    const entity = await super._loadEntity(Proposal.tableName, id);
     if (!entity) return null;
 
     const model = new Proposal(id);
@@ -216,7 +216,7 @@ export class Space extends Model {
   }
 
   static async loadEntity(id: string): Promise<Space | null> {
-    const entity = await super.loadEntity(Space.tableName, id);
+    const entity = await super._loadEntity(Space.tableName, id);
     if (!entity) return null;
 
     const model = new Space(id);
@@ -318,7 +318,7 @@ export class Proposal extends Model {
   }
 
   static async loadEntity(id: string): Promise<Proposal | null> {
-    const entity = await super.loadEntity(Proposal.tableName, id);
+    const entity = await super._loadEntity(Proposal.tableName, id);
     if (!entity) return null;
 
     const model = new Proposal(id);
