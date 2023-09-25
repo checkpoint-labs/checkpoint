@@ -37,7 +37,7 @@ export default class Model {
   }
 
   get(key: string): any {
-    return this.values.get(key) || null;
+    return this.values.get(key) ?? null;
   }
 
   set(key: string, value: any) {
