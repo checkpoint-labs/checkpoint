@@ -154,7 +154,10 @@ export const codegen = (
     contents += `    const model = new ${modelName}(id);\n`;
     contents += `    model.setExists();\n\n`;
     contents += `    for (const key in entity) {\n`;
-    contents += `      model.set(key, entity[key]);\n`;
+    contents += `      const value = entity[key] !== null && typeof entity[key] === 'object'\n`;
+    contents += `        ? JSON.stringify(entity[key])\n`;
+    contents += `        : entity[key];\n`;
+    contents += `      model.set(key, value);\n`;
     contents += `    }\n\n`;
     contents += `    return model;\n`;
     contents += `  }\n\n`;
