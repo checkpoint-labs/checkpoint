@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { Knex } from 'knex';
 import { Logger } from '../utils/logger';
+import { chunk } from '../utils/helpers';
 import { TemplateSource } from '../types';
 
 const Table = {
@@ -184,34 +185,38 @@ export class CheckpointsStore {
   }
 
   public async insertCheckpoints(checkpoints: CheckpointRecord[]): Promise<void> {
-    try {
-      if (checkpoints.length === 0) {
-        return;
+    const insert = async (items: CheckpointRecord[]) => {
+      try {
+        if (items.length === 0) {
+          return;
+        }
+
+        await this.knex
+          .table(Table.Checkpoints)
+          .insert(
+            items.map(checkpoint => {
+              const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
+
+              return {
+                [Fields.Checkpoints.Id]: id,
+                [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
+                [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
+              };
+            })
+          )
+          .onConflict(Fields.Checkpoints.Id)
+          .ignore();
+      } catch (err: any) {
+        if (['ER_LOCK_DEADLOCK', '40P01'].includes(err.code)) {
+          this.log.debug('deadlock detected, retrying...');
+          return this.insertCheckpoints(items);
+        }
+
+        throw err;
       }
+    };
 
-      await this.knex
-        .table(Table.Checkpoints)
-        .insert(
-          checkpoints.map(checkpoint => {
-            const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
-
-            return {
-              [Fields.Checkpoints.Id]: id,
-              [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
-              [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
-            };
-          })
-        )
-        .onConflict(Fields.Checkpoints.Id)
-        .ignore();
-    } catch (err: any) {
-      if (err.code === 'ER_LOCK_DEADLOCK') {
-        this.log.debug('deadlock detected, retrying...');
-        return this.insertCheckpoints(checkpoints);
-      }
-
-      throw err;
-    }
+    await Promise.all(chunk(checkpoints, 1000).map(chunk => insert(chunk)));
   }
 
   /**
