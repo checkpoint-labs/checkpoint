@@ -472,10 +472,13 @@ export class GqlEntityController {
       if (
         idField &&
         idField.type instanceof GraphQLNonNull &&
-        idField.type.ofType instanceof GraphQLScalarType &&
-        ['String', 'ID'].includes(idField.type.ofType.name)
+        idField.type.ofType instanceof GraphQLScalarType
       ) {
-        return { name: 'string', options: [256] };
+        if (['String', 'ID'].includes(idField.type.ofType.name)) {
+          return { name: 'string', options: [256] };
+        } else if (idField.type.ofType.name === 'Int') {
+          return { name: 'integer' };
+        }
       }
     }
 
@@ -501,6 +504,6 @@ export class GqlEntityController {
       return { name: 'json' };
     }
 
-    throw new Error(`sql type for ${type} not support`);
+    throw new Error(`sql type for ${type} is not supported`);
   }
 }
