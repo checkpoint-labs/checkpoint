@@ -25,7 +25,7 @@ import {
 
 const BLOCK_PRELOAD = 100;
 const BLOCK_PRELOAD_OFFSET = 50;
-const DEFAULT_FETCH_INTERVAL = 7000;
+const DEFAULT_FETCH_INTERVAL = 2000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
