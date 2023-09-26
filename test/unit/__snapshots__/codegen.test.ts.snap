@@ -28,7 +28,10 @@ export class Space extends Model {
     model.setExists();
 
     for (const key in entity) {
-      model.set(key, entity[key]);
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
     }
 
     return model;
@@ -130,7 +133,10 @@ export class Proposal extends Model {
     model.setExists();
 
     for (const key in entity) {
-      model.set(key, entity[key]);
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
     }
 
     return model;
@@ -223,7 +229,10 @@ export class Space extends Model {
     model.setExists();
 
     for (const key in entity) {
-      model.set(key, entity[key]);
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
     }
 
     return model;
@@ -325,7 +334,10 @@ export class Proposal extends Model {
     model.setExists();
 
     for (const key in entity) {
-      model.set(key, entity[key]);
+      const value = entity[key] !== null && typeof entity[key] === 'object'
+        ? JSON.stringify(entity[key])
+        : entity[key];
+      model.set(key, value);
     }
 
     return model;
