@@ -157,6 +157,7 @@ export default class Checkpoint {
     this.log.debug('starting');
 
     await this.validateStore();
+    await this.networkProvider.init();
 
     const templateSources = await this.store.getTemplateSources();
     await Promise.all(

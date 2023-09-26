@@ -17,6 +17,7 @@ import {
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
   private processedPoolTransactions = new Set();
+  private startupLatestBlockNumber: number | undefined;
 
   constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
     super({ instance, log, abis });
@@ -24,6 +25,10 @@ export class StarknetProvider extends BaseProvider {
     this.provider = new RpcProvider({
       nodeUrl: this.instance.config.network_node_url
     });
+  }
+
+  public async init() {
+    this.startupLatestBlockNumber = await this.getLatestBlockNumber();
   }
 
   formatAddresses(addresses: string[]): string[] {
@@ -53,7 +58,7 @@ export class StarknetProvider extends BaseProvider {
         throw new Error('invalid block');
       }
     } catch (e) {
-      if ((e as Error).message.includes('Block not found')) {
+      if ((e as Error).message.includes('Block not found') || e instanceof BlockNotFoundError) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
       }
@@ -279,6 +284,14 @@ export class StarknetProvider extends BaseProvider {
 
       continuationToken = result.continuation_token;
     } while (continuationToken);
+
+    if (
+      events.length === 0 &&
+      this.startupLatestBlockNumber &&
+      blockNumber > this.startupLatestBlockNumber
+    ) {
+      throw new BlockNotFoundError();
+    }
 
     return events.reduce((acc, event) => {
       if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];

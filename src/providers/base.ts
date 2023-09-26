@@ -46,6 +46,10 @@ export class BaseProvider {
     }
   }
 
+  init(): Promise<void> {
+    throw new Error('init method was not defined');
+  }
+
   formatAddresses(addresses: string[]): string[] {
     throw new Error(
       `formatAddresses method was not defined when formatting ${addresses.length} addresses`
