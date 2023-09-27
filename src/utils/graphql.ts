@@ -72,7 +72,7 @@ export const generateQueryForEntity = (entity: GraphQLObjectType): string => {
   );
 };
 
-export const getNonNullType = (type: GraphQLOutputType): GraphQLOutputType => {
+export const getNonNullType = <T>(type: T): T => {
   if (type instanceof GraphQLNonNull) {
     return type.ofType;
   }
