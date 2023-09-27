@@ -352,9 +352,10 @@ export default class Checkpoint {
   private async next(blockNum: number) {
     if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
 
+    let checkpointBlock;
     if (!this.config.disable_checkpoints && !this.config.tx_fn && !this.config.global_events) {
       if (blockNum <= this.prefetchEndBlock) {
-        const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+        checkpointBlock = await this.getNextCheckpointBlock(blockNum);
 
         if (checkpointBlock) {
           blockNum = checkpointBlock;
@@ -386,6 +387,10 @@ export default class Checkpoint {
         }
       } else {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
+      }
+
+      if (checkpointBlock && this.cpBlocksCache) {
+        this.cpBlocksCache.unshift(checkpointBlock);
       }
 
       await Promise.delay(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
