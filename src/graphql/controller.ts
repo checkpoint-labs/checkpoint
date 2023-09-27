@@ -306,7 +306,7 @@ export class GqlEntityController {
     type: GraphQLObjectType,
     resolver: GraphQLFieldResolver<Parent, Context>
   ): GraphQLFieldConfig<Parent, Context> {
-    const getWhereType = (type: GraphQLObjectType<any, any>): WhereResult => {
+    const getWhereType = (type: GraphQLObjectType<any, any>, level = 0): WhereResult => {
       const name = `${type.name}_filter`;
 
       const cachedValue = cache.get(name);
@@ -333,7 +333,12 @@ export class GqlEntityController {
             idField.type.ofType instanceof GraphQLScalarType &&
             ['String', 'ID'].includes(idField.type.ofType.name)
           ) {
-            whereInputConfig.fields[`${field.name}_`] = getWhereType(nonNullFieldType).where;
+            if (level === 0) {
+              whereInputConfig.fields[`${field.name}_`] = getWhereType(
+                nonNullFieldType,
+                level + 1
+              ).where;
+            }
 
             nonNullFieldType = getNonNullType(idField.type);
           }
