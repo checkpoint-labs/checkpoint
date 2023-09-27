@@ -6,6 +6,7 @@ import {
   GraphQLResolveInfo,
   GraphQLScalarType,
   isListType,
+  isObjectType,
   isScalarType
 } from 'graphql';
 import {
@@ -70,11 +71,21 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
         query = query.whereIn(`${prefix}.${w[0].slice(0, -3)}`, w[1]);
       } else if (typeof w[1] === 'object' && w[0].endsWith('_')) {
         const fieldName = w[0].slice(0, -1);
-        const nestedReturnType = returnType.getFields()[fieldName].type as GraphQLObjectType;
+        const nestedReturnType = getNonNullType(
+          returnType.getFields()[fieldName].type as GraphQLObjectType
+        );
         const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
 
         const fields = Object.values(nestedReturnType.getFields())
-          .filter(field => isScalarType(getNonNullType(field.type)))
+          .filter(field => {
+            const baseType = getNonNullType(field.type);
+
+            return (
+              isScalarType(baseType) ||
+              isObjectType(baseType) ||
+              (isListType(baseType) && isScalarType(baseType.ofType))
+            );
+          })
           .map(field => field.name);
 
         nestedEntitiesMappings[fieldName] = {
