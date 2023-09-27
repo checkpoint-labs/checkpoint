@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { Knex } from 'knex';
 import { Logger } from '../utils/logger';
+import { chunk } from '../utils/helpers';
 import { TemplateSource } from '../types';
 
 const Table = {
@@ -42,6 +43,7 @@ export interface CheckpointRecord {
  */
 export enum MetadataId {
   LastIndexedBlock = 'last_indexed_block',
+  LastPrefetchedBlock = 'last_fetched_block',
   NetworkIdentifier = 'network_identifier',
   StartBlock = 'start_block',
   ConfigChecksum = 'config_checksum'
@@ -183,25 +185,38 @@ export class CheckpointsStore {
   }
 
   public async insertCheckpoints(checkpoints: CheckpointRecord[]): Promise<void> {
-    if (checkpoints.length === 0) {
-      return;
-    }
+    const insert = async (items: CheckpointRecord[]) => {
+      try {
+        if (items.length === 0) {
+          return;
+        }
 
-    await this.knex
-      .table(Table.Checkpoints)
-      .insert(
-        checkpoints.map(checkpoint => {
-          const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
+        await this.knex
+          .table(Table.Checkpoints)
+          .insert(
+            items.map(checkpoint => {
+              const id = getCheckpointId(checkpoint.contractAddress, checkpoint.blockNumber);
 
-          return {
-            [Fields.Checkpoints.Id]: id,
-            [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
-            [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
-          };
-        })
-      )
-      .onConflict(Fields.Checkpoints.Id)
-      .ignore();
+              return {
+                [Fields.Checkpoints.Id]: id,
+                [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
+                [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
+              };
+            })
+          )
+          .onConflict(Fields.Checkpoints.Id)
+          .ignore();
+      } catch (err: any) {
+        if (['ER_LOCK_DEADLOCK', '40P01'].includes(err.code)) {
+          this.log.debug('deadlock detected, retrying...');
+          return this.insertCheckpoints(items);
+        }
+
+        throw err;
+      }
+    };
+
+    await Promise.all(chunk(checkpoints, 1000).map(chunk => insert(chunk)));
   }
 
   /**
@@ -228,6 +243,29 @@ export class CheckpointsStore {
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
 
     return result.map(value => Number(value[Fields.Checkpoints.BlockNumber]));
+  }
+
+  /**
+   * Remove all checkpoint blocks lower or equal to specified block number
+   * that are not related to the contracts in the list.
+   * @param block
+   * @param contracts
+   */
+  public async purgeCheckpointBlocks(block: number, contracts: string[]) {
+    try {
+      await this.knex
+        .table(Table.Checkpoints)
+        .where(Fields.Checkpoints.BlockNumber, '<=', block)
+        .whereNotIn(Fields.Checkpoints.ContractAddress, contracts)
+        .del();
+    } catch (err: any) {
+      if (err.code === 'ER_LOCK_DEADLOCK') {
+        this.log.debug('deadlock detected, retrying...');
+        return this.purgeCheckpointBlocks(block, contracts);
+      }
+
+      throw err;
+    }
   }
 
   public async insertTemplateSource(

@@ -23,7 +23,9 @@ import {
   TemplateSource
 } from './types';
 
-const DEFAULT_FETCH_INTERVAL = 7000;
+const BLOCK_PRELOAD = 100;
+const BLOCK_PRELOAD_OFFSET = 50;
+const DEFAULT_FETCH_INTERVAL = 2000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -42,6 +44,8 @@ export default class Checkpoint {
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
   private sourceContracts: string[];
+  private prefetchDone = false;
+  private prefetchEndBlock: number | null = null;
   private cpBlocksCache: number[] | null;
 
   constructor(
@@ -64,9 +68,6 @@ export default class Checkpoint {
 
     this.entityController = new GqlEntityController(this.schema, config);
 
-    this.sourceContracts = getContractsFromConfig(config);
-    this.cpBlocksCache = [];
-
     this.log = createLogger({
       base: { component: 'checkpoint' },
       level: opts?.logLevel || LogLevel.Error,
@@ -81,6 +82,9 @@ export default class Checkpoint {
 
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
     this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
+
+    this.sourceContracts = this.networkProvider.formatAddresses(getContractsFromConfig(config));
+    this.cpBlocksCache = [];
 
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
     if (!dbConnection) {
@@ -153,6 +157,7 @@ export default class Checkpoint {
     this.log.debug('starting');
 
     await this.validateStore();
+    await this.networkProvider.init();
 
     const templateSources = await this.store.getTemplateSources();
     await Promise.all(
@@ -169,6 +174,15 @@ export default class Checkpoint {
     );
 
     const blockNum = await this.getStartBlockNum();
+    const lastPrefetchedBlock =
+      (await this.store.getMetadataNumber(MetadataId.LastPrefetchedBlock)) ?? blockNum;
+    this.prefetchEndBlock =
+      (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
+
+    if (!this.config.disable_checkpoints) {
+      this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
+    }
+
     return await this.next(blockNum);
   }
 
@@ -211,7 +225,9 @@ export default class Checkpoint {
     if (!this.config.sources) this.config.sources = [];
 
     this.config.sources.push(source);
-    this.sourceContracts = getContractsFromConfig(this.config);
+    this.sourceContracts = this.networkProvider.formatAddresses(
+      getContractsFromConfig(this.config)
+    );
     this.cpBlocksCache = [];
   }
 
@@ -312,16 +328,53 @@ export default class Checkpoint {
     return nextBlock > start ? nextBlock : start;
   }
 
+  private async nextEvents(blockNum: number) {
+    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
+    if (blockNum > this.prefetchEndBlock) {
+      this.prefetchDone = true;
+      return;
+    }
+
+    const toBlock = Math.min(blockNum + BLOCK_PRELOAD, this.prefetchEndBlock);
+    const checkpoints = await this.networkProvider.getCheckpointsRange(blockNum, toBlock);
+
+    await this.store.insertCheckpoints(checkpoints);
+    await this.store.setMetadata(MetadataId.LastPrefetchedBlock, toBlock);
+
+    this.log.info(
+      { blockNumber: blockNum, checkpointsLength: checkpoints.length },
+      'checkpoints inserted'
+    );
+
+    this.nextEvents(blockNum + BLOCK_PRELOAD + 1);
+  }
+
   private async next(blockNum: number) {
-    if (!this.config.tx_fn && !this.config.global_events) {
-      const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
-      if (checkpointBlock) blockNum = checkpointBlock;
+    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
+
+    if (!this.config.disable_checkpoints && !this.config.tx_fn && !this.config.global_events) {
+      if (blockNum <= this.prefetchEndBlock) {
+        const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+
+        if (checkpointBlock) {
+          blockNum = checkpointBlock;
+        } else {
+          if (this.prefetchDone) {
+            return this.next(this.prefetchEndBlock + 1);
+          }
+
+          this.log.info({ blockNumber: blockNum }, 'no more checkpoint blocks. waiting');
+          await Promise.delay(10000);
+          return this.next(blockNum);
+        }
+      }
     }
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
       const nextBlock = await this.networkProvider.processBlock(blockNum);
+      await this.store.purgeCheckpointBlocks(blockNum, this.sourceContracts);
 
       return this.next(nextBlock);
     } catch (err) {
@@ -341,28 +394,17 @@ export default class Checkpoint {
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
-    if (this.cpBlocksCache === null) {
-      // cache is null when we can no more find a record in the database
-      // so exiting early here to avoid polling the database in subsequent
-      // loops.
-      return null;
-    }
-
-    if (this.cpBlocksCache.length !== 0) {
+    if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
       return this.cpBlocksCache.shift();
     }
 
     const checkpointBlocks = await this.store.getNextCheckpointBlocks(
       blockNum,
-      this.sourceContracts
+      this.sourceContracts,
+      15
     );
-    if (checkpointBlocks.length === 0) {
-      this.log.info({ blockNumber: blockNum }, 'no more checkpoint blocks in store');
-      // disabling cache to stop polling database
-      this.cpBlocksCache = null;
 
-      return null;
-    }
+    if (checkpointBlocks.length === 0) return null;
 
     this.cpBlocksCache = checkpointBlocks;
     return this.cpBlocksCache.shift();
