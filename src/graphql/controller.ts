@@ -403,7 +403,7 @@ export class GqlEntityController {
     const { where, orderByValues } = getWhereType(type);
 
     const OrderByEnum = new GraphQLEnumType({
-      name: `OrderBy${type.name}Fields`,
+      name: `${type.name}_orderBy`,
       values: orderByValues
     });
 
