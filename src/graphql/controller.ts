@@ -331,7 +331,7 @@ export class GqlEntityController {
             idField &&
             idField.type instanceof GraphQLNonNull &&
             idField.type.ofType instanceof GraphQLScalarType &&
-            ['String', 'ID'].includes(idField.type.ofType.name)
+            ['String', 'Int', 'ID'].includes(idField.type.ofType.name)
           ) {
             if (level === 0) {
               whereInputConfig.fields[`${field.name}_`] = getWhereType(
