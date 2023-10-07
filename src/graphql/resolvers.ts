@@ -153,6 +153,7 @@ export async function querySingle(
 
   const currentValue = parent?.[info.fieldName];
 
+  if (currentValue === null) return null;
   const alreadyResolvedInParent = typeof currentValue === 'object';
   if (alreadyResolvedInParent) {
     return formatItem(currentValue, jsonFields);
