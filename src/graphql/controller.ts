@@ -56,8 +56,6 @@ type WhereResult = {
   orderByValues: Record<string, { value: string }>;
 };
 
-const cache = new Map<string, WhereResult>();
-
 /**
  * Controller for performing actions based on the graphql schema provided to its
  * constructor. It exposes public functions to generate graphql or database
@@ -306,11 +304,11 @@ export class GqlEntityController {
     type: GraphQLObjectType,
     resolver: GraphQLFieldResolver<Parent, Context>
   ): GraphQLFieldConfig<Parent, Context> {
-    const getWhereType = (type: GraphQLObjectType<any, any>, level = 0): WhereResult => {
-      const name = `${type.name}_filter`;
-
-      const cachedValue = cache.get(name);
-      if (cachedValue) return cachedValue;
+    const getWhereType = (
+      nestedType: GraphQLObjectType<any, any>,
+      prefix?: string
+    ): WhereResult => {
+      const name = prefix ? `${prefix}_${nestedType.name}_filter` : `${nestedType.name}_filter`;
 
       const orderByValues = {};
       const whereInputConfig: GraphQLInputObjectTypeConfig = {
@@ -318,25 +316,25 @@ export class GqlEntityController {
         fields: {}
       };
 
-      this.getTypeFields(type).forEach(field => {
+      this.getTypeFields(nestedType).forEach(field => {
         // all field types in a where input variable must be optional
         // so we try to extract the non null type here.
         let nonNullFieldType = getNonNullType(field.type);
 
         if (nonNullFieldType instanceof GraphQLObjectType) {
-          const fields = type.getFields();
+          const fields = nestedType.getFields();
           const idField = fields['id'];
 
           if (
             idField &&
             idField.type instanceof GraphQLNonNull &&
             idField.type.ofType instanceof GraphQLScalarType &&
-            ['String', 'ID'].includes(idField.type.ofType.name)
+            ['String', 'Int', 'ID'].includes(idField.type.ofType.name)
           ) {
-            if (level === 0) {
+            if (!prefix) {
               whereInputConfig.fields[`${field.name}_`] = getWhereType(
                 nonNullFieldType,
-                level + 1
+                nestedType.name
               ).where;
             }
 
@@ -394,8 +392,6 @@ export class GqlEntityController {
         where: { type: new GraphQLInputObjectType(whereInputConfig) },
         orderByValues
       };
-
-      cache.set(name, result);
 
       return result;
     };
