@@ -199,21 +199,8 @@ export class GqlEntityController {
    *   INDEX name (name)
    * );
    * ```
-   *
-   will execute the following SQL when declaring id as autoincrement:
-   * ```sql
-   * DROP TABLE IF EXISTS votes;
-   * CREATE TABLE votes (
-   *   id integer not null primary key autoincrement,
-   *   name VARCHAR(128),
-   * );
-   * ```
-   * 
    */
-  public async createEntityStores(
-    knex: Knex,
-    schema: string
-  ): Promise<{ builder: Knex.SchemaBuilder }> {
+  public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
     if (this.schemaObjects.length === 0) {
@@ -224,15 +211,7 @@ export class GqlEntityController {
       const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        //if there is no autoIncrement fields on current table, mark the id as primary
-        const tableHasAutoIncrement = this.getTypeFields(type).some(field => {
-          const directives = field.astNode?.directives ?? [];
-          const autoIncrementDirective = directives.find(dir => dir.name.value === 'autoIncrement');
-          return autoIncrementDirective;
-        })
-
-        if (!tableHasAutoIncrement)
-          t.primary(['id']);
+        let tableHasAutoIncrement = false;
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
@@ -244,6 +223,7 @@ export class GqlEntityController {
           //Check if field is declared as autoincrement
           if (autoIncrementDirective) {
             t.increments(field.name, { primaryKey: true });
+            tableHasAutoIncrement = true;
           } else {
             const sqlType = this.getSqlType(field.type);
             let column =
@@ -260,6 +240,8 @@ export class GqlEntityController {
             }
           }
         });
+
+        if (!tableHasAutoIncrement) t.primary(['id']);
       });
     });
 

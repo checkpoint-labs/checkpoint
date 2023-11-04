@@ -72,32 +72,8 @@ type Vote {
   `;
 
       const controller = new GqlEntityController(schema);
-      const { builder } = await controller.createEntityStores(mockKnex, schema);
+      const { builder } = await controller.createEntityStores(mockKnex);
 
-      const createQuery = builder.toString();
-      expect(createQuery).toMatchSnapshot();
-    });
-
-    it('should work with autoincrement', async () => {
-      let schema = `
-scalar BigInt
-scalar Decimal
-scalar BigDecimal
-
-type Vote {
-  id: Int! @autoIncrement
-  name: String
-  authenticators: [String]
-  big_number: BigInt
-  decimal: Decimal
-  big_decimal: BigDecimal
-}
-
-  `;
-
-      schema = extendSchema(schema);
-      const controller = new GqlEntityController(schema);
-      const { builder } = await controller.createEntityStores(mockKnex, schema);
       const createQuery = builder.toString();
       expect(createQuery).toMatchSnapshot();
     });
@@ -127,7 +103,7 @@ type Poster {
 
       schema = extendSchema(schema);
       const controller = new GqlEntityController(schema);
-      const { builder } = await controller.createEntityStores(mockKnex, schema);
+      const { builder } = await controller.createEntityStores(mockKnex);
       const createQuery = builder.toString();
       expect(createQuery).toMatchSnapshot();
     });

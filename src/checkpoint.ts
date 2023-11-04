@@ -73,10 +73,10 @@ export default class Checkpoint {
       level: opts?.logLevel || LogLevel.Error,
       ...(opts?.prettifyLogs
         ? {
-          transport: {
-            target: 'pino-pretty'
+            transport: {
+              target: 'pino-pretty'
+            }
           }
-        }
         : {})
     });
 
@@ -205,7 +205,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
-    await this.entityController.createEntityStores(this.knex, this.schema);
+    await this.entityController.createEntityStores(this.knex);
   }
 
   /**
