@@ -13,7 +13,7 @@ import {
 
 // Shortcuts to starknet types.
 export type Block = RPC.GetBlockWithTxs;
-export type Transaction = RPC.Transaction;
+export type Transaction = RPC.GetBlockWithTxs['transactions'][number];
 export type PendingTransaction = RPC.PendingTransactions[number];
 export type Event = RPC.GetEventsResponse['events'][number];
 

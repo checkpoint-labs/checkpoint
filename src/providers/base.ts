@@ -1,6 +1,7 @@
 import { Pool as PgPool } from 'pg';
-import { Logger } from '../utils/logger';
 import Checkpoint from '../checkpoint';
+import { CheckpointRecord } from '../stores/checkpoints';
+import { Logger } from '../utils/logger';
 import { AsyncMySqlPool } from '../mysql';
 import { CheckpointConfig, CheckpointWriters, ContractSourceConfig } from '../types';
 
@@ -45,8 +46,22 @@ export class BaseProvider {
     }
   }
 
+  init(): Promise<void> {
+    throw new Error('init method was not defined');
+  }
+
+  formatAddresses(addresses: string[]): string[] {
+    throw new Error(
+      `formatAddresses method was not defined when formatting ${addresses.length} addresses`
+    );
+  }
+
   getNetworkIdentifier(): Promise<string> {
     throw new Error('getNetworkIdentifier method was not defined');
+  }
+
+  getLatestBlockNumber(): Promise<number> {
+    throw new Error('getLatestBlockNumber method was not defined');
   }
 
   processBlock(blockNum: number): Promise<number> {
@@ -56,6 +71,12 @@ export class BaseProvider {
   processPool(blockNumber: number) {
     throw new Error(
       `processPool method was not defined when fetching pool for block ${blockNumber}`
+    );
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    throw new Error(
+      `getEventsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
     );
   }
 }

@@ -1,71 +1,24 @@
-import type { Abi } from 'starknet';
+import { Abi, CallData, Event, ParsedEvent, events } from 'starknet';
 
-type StructAbi = {
-  name: string;
-  size: number;
-  members: { name: string; type: string }[];
+const convertEvent = (input: any) => {
+  if (typeof input === 'bigint') return `0x${input.toString(16)}`;
+  if (Array.isArray(input)) return input.map(convertEvent);
+  if (typeof input === 'object')
+    return Object.fromEntries(Object.entries(input).map(([k, v]) => [k, convertEvent(v)]));
+
+  return input;
 };
 
-export const parseStruct = (
-  type: string,
-  data: string[],
-  { current, structs }: { current: number; structs: Record<string, StructAbi> }
-) => {
-  const struct = structs[type];
-  let structCurrent = current;
+export const parseEvent = (abi: Abi, event: Event): ParsedEvent => {
+  const abiEvents = events.getAbiEvents(abi);
+  const structs = CallData.getAbiStruct(abi);
+  const enums = CallData.getAbiEnum(abi);
 
-  return struct.members.reduce((output, field) => {
-    if (structs[field.type]) {
-      output[field.name] = parseStruct(field.type, data, { current: structCurrent, structs });
-      structCurrent += structs[field.type].size;
+  const parsedEvents = events.parseEvents([event], abiEvents, structs, enums);
+  if (parsedEvents.length === 0) throw new Error('Failed to parse event');
 
-      return output;
-    }
+  const parsedEvent = parsedEvents[0];
+  const key = Object.keys(parsedEvent)[0];
 
-    output[field.name] = data[structCurrent];
-    structCurrent++;
-
-    return output;
-  }, {});
-};
-
-export const parseEvent = (abi: Abi, name: string, data: string[]): Record<string, any> => {
-  const event = abi.find(el => el.name === name && el.type === 'event');
-  if (!event) throw new Error('Unsupported event');
-
-  const structs = abi
-    .filter(el => el.type === 'struct')
-    .reduce((acc, structAbi) => {
-      acc[structAbi.name] = structAbi;
-      return acc;
-    }, {});
-
-  let length = 0;
-  let current = 0;
-
-  return event.data.reduce((output, field) => {
-    if (length > 0) {
-      output[field.name] = data.slice(current, current + length);
-      current += length;
-      length = 0;
-
-      return output;
-    }
-
-    if (structs[field.type]) {
-      output[field.name] = parseStruct(field.type, data, { current, structs });
-      current += structs[field.type].size;
-
-      return output;
-    }
-
-    output[field.name] = data[current];
-    if (field.name.endsWith('_len')) {
-      length = parseInt(BigInt(data[current]).toString());
-    }
-
-    current++;
-
-    return output;
-  }, {});
+  return convertEvent(parsedEvent[key]);
 };

@@ -37,7 +37,7 @@ export default class Model {
   }
 
   get(key: string): any {
-    return this.values.get(key) || null;
+    return this.values.get(key) ?? null;
   }
 
   set(key: string, value: any) {
@@ -45,7 +45,10 @@ export default class Model {
     this.valuesImplicitlySet.add(key);
   }
 
-  static async loadEntity(tableName: string, id: string): Promise<Record<string, any> | null> {
+  static async _loadEntity(
+    tableName: string,
+    id: string | number
+  ): Promise<Record<string, any> | null> {
     const knex = register.getKnex();
 
     const entity = await knex.table(tableName).select('*').where('id', id).first();

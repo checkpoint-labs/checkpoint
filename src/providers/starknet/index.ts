@@ -1,21 +1,23 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
 import { BaseProvider, BlockNotFoundError } from '../base';
 import { parseEvent } from './utils';
-import type { Abi } from 'starknet';
+import { CheckpointRecord } from '../../stores/checkpoints';
 import { isFullBlock, isDeployTransaction } from '../../types';
-import type {
+import {
   Block,
   FullBlock,
   Transaction,
   PendingTransaction,
   Event,
   EventsMap,
-  ParsedEvent
+  ParsedEvent,
+  ContractSourceConfig
 } from '../../types';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
   private processedPoolTransactions = new Set();
+  private startupLatestBlockNumber: number | undefined;
 
   constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
     super({ instance, log, abis });
@@ -25,9 +27,21 @@ export class StarknetProvider extends BaseProvider {
     });
   }
 
+  public async init() {
+    this.startupLatestBlockNumber = await this.getLatestBlockNumber();
+  }
+
+  formatAddresses(addresses: string[]): string[] {
+    return addresses.map(address => validateAndParseAddress(address));
+  }
+
   async getNetworkIdentifier(): Promise<string> {
     const result = await this.provider.getChainId();
     return `starknet_${result}`;
+  }
+
+  async getLatestBlockNumber(): Promise<number> {
+    return this.provider.getBlockNumber();
   }
 
   async processBlock(blockNum: number) {
@@ -44,7 +58,7 @@ export class StarknetProvider extends BaseProvider {
         throw new Error('invalid block');
       }
     } catch (e) {
-      if ((e as Error).message.includes('Block not found')) {
+      if ((e as Error).message.includes('Block not found') || e instanceof BlockNotFoundError) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
       }
@@ -153,7 +167,7 @@ export class StarknetProvider extends BaseProvider {
 
     if (this.instance.config.global_events) {
       const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
-        handlers[`0x${hash.starknetKeccak(event.name).toString('hex')}`] = {
+        handlers[`0x${hash.starknetKeccak(event.name).toString(16)}`] = {
           name: event.name,
           fn: event.fn
         };
@@ -180,8 +194,11 @@ export class StarknetProvider extends BaseProvider {
       }
     }
 
-    for (const source of this.instance.getCurrentSources(blockNumber)) {
-      let foundContractData = false;
+    let lastSources = this.instance.getCurrentSources(blockNumber);
+    const sourcesQueue = [...lastSources];
+
+    let source: ContractSourceConfig | undefined;
+    while ((source = sourcesQueue.shift())) {
       const contract = validateAndParseAddress(source.contract);
 
       if (
@@ -189,7 +206,6 @@ export class StarknetProvider extends BaseProvider {
         source.deploy_fn &&
         contract === validateAndParseAddress(tx.contract_address)
       ) {
-        foundContractData = true;
         this.log.info(
           { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
           'found deployment transaction'
@@ -207,8 +223,7 @@ export class StarknetProvider extends BaseProvider {
       for (const [eventIndex, event] of events.entries()) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
-            if (`0x${hash.starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
-              foundContractData = true;
+            if (`0x${hash.starknetKeccak(sourceEvent.name).toString(16)}` === event.keys[0]) {
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
                 'found contract event'
@@ -217,11 +232,7 @@ export class StarknetProvider extends BaseProvider {
               let parsedEvent: ParsedEvent | undefined;
               if (source.abi && this.abis?.[source.abi]) {
                 try {
-                  parsedEvent = parseEvent(
-                    this.abis?.[source.abi] as Abi,
-                    sourceEvent.name,
-                    event.data
-                  );
+                  parsedEvent = parseEvent(this.abis[source.abi], event);
                 } catch (err) {
                   this.log.warn(
                     { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
@@ -245,9 +256,13 @@ export class StarknetProvider extends BaseProvider {
         }
       }
 
-      if (foundContractData) {
-        await this.instance.insertCheckpoints([{ blockNumber, contractAddress: source.contract }]);
-      }
+      const nextSources = this.instance.getCurrentSources(blockNumber);
+      const newSources = nextSources.filter(
+        nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
+      );
+
+      sourcesQueue.push(...newSources);
+      lastSources = nextSources;
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
@@ -270,6 +285,14 @@ export class StarknetProvider extends BaseProvider {
       continuationToken = result.continuation_token;
     } while (continuationToken);
 
+    if (
+      events.length === 0 &&
+      this.startupLatestBlockNumber &&
+      blockNumber > this.startupLatestBlockNumber
+    ) {
+      throw new BlockNotFoundError();
+    }
+
     return events.reduce((acc, event) => {
       if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
 
@@ -277,5 +300,28 @@ export class StarknetProvider extends BaseProvider {
 
       return acc;
     }, {});
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events: Event[] = [];
+
+    let continuationToken: string | undefined;
+    do {
+      const result = await this.provider.getEvents({
+        from_block: { block_number: fromBlock },
+        to_block: { block_number: toBlock },
+        chunk_size: 1000,
+        continuation_token: continuationToken
+      });
+
+      events.push(...result.events);
+
+      continuationToken = result.continuation_token;
+    } while (continuationToken);
+
+    return events.map(event => ({
+      blockNumber: event.block_number,
+      contractAddress: validateAndParseAddress(event.from_address)
+    }));
   }
 }
