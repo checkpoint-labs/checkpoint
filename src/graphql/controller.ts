@@ -30,7 +30,7 @@ import {
   singleEntityQueryName,
   getNonNullType
 } from '../utils/graphql';
-import { autoIncrementFieldPattern, CheckpointConfig, tableNamePattern } from '../types';
+import { CheckpointConfig } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
 
 /**
@@ -216,8 +216,6 @@ export class GqlEntityController {
   ): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
-    const autoIncrementFieldsMap = this.extractAutoIncrementFields(schema);
-
     if (this.schemaObjects.length === 0) {
       return { builder };
     }
@@ -227,18 +225,24 @@ export class GqlEntityController {
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
         //if there is no autoIncrement fields on current table, mark the id as primary
-        if (
-          autoIncrementFieldsMap.size == 0 ||
-          autoIncrementFieldsMap.get(tableName)?.length === 0
-        ) {
+        const tableHasAutoIncrement = this.getTypeFields(type).some(field => {
+          const directives = field.astNode?.directives ?? [];
+          const autoIncrementDirective = directives.find(dir => dir.name.value === 'autoIncrement');
+          return autoIncrementDirective;
+        })
+
+        if (!tableHasAutoIncrement)
           t.primary(['id']);
-        }
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
           if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
+
+          const directives = field.astNode?.directives ?? [];
+          const autoIncrementDirective = directives.find(dir => dir.name.value === 'autoIncrement');
+
           //Check if field is declared as autoincrement
-          if (autoIncrementFieldsMap.get(tableName)?.includes(field.name)) {
+          if (autoIncrementDirective) {
             t.increments(field.name, { primaryKey: true });
           } else {
             const sqlType = this.getSqlType(field.type);
@@ -261,42 +265,6 @@ export class GqlEntityController {
 
     await builder;
     return { builder };
-  }
-
-  /**
-   * Parse schema to extract table and fields witrh annotation autoIncrement
-   * @param schema
-   * @returns A map where key is table name and values a list of fields with annotation autoIncrement
-   */
-  private extractAutoIncrementFields(schema: string) {
-    const autoIncrementFieldsMap = new Map<string, string[]>();
-    let currentTable = '';
-
-    schema.split('\n').forEach(line => {
-      const matchTable = line.match(tableNamePattern);
-      //check for current table name
-      if (matchTable && matchTable[1]) {
-        const tableName = pluralize.plural(matchTable[1].toLocaleLowerCase());
-        if (tableName !== currentTable) {
-          currentTable = tableName;
-        }
-      } else {
-        //check for fields
-        const matchAutoIncrement = line.match(autoIncrementFieldPattern());
-        if (matchAutoIncrement && matchAutoIncrement[1]) {
-          const field = matchAutoIncrement[1];
-          // Check if the key already exists in the map
-          if (autoIncrementFieldsMap.has(currentTable)) {
-            const existingFields = autoIncrementFieldsMap.get(currentTable);
-            existingFields?.push(field);
-          } else {
-            autoIncrementFieldsMap.set(currentTable, [field]);
-          }
-        }
-      }
-    });
-
-    return autoIncrementFieldsMap;
   }
 
   /**

@@ -112,23 +112,3 @@ export function isFullBlock(block: Block): block is FullBlock {
 export function isDeployTransaction(tx: Transaction | PendingTransaction): tx is DeployTransaction {
   return tx.type === 'DEPLOY';
 }
-
-/**
- * AutoIncrement annotation in schema.gql
- */
-export const autoIncrementTag = /@autoIncrement/;
-
-/**
- * Regex pattern to find table name in schema.gql
- */
-export const tableNamePattern = /type\s+(\w+)\s+{/;
-
-/**
- * Regex pattern to find field name having annotion "@autoIncrement" in schema.gql
- * Consider only field type : Int!,ID!, BigInt,
- * @returns regex expression : /(\w+):\s(Int|ID|BigInt)!?\s+@autoIncrement/
- */
-export function autoIncrementFieldPattern(): RegExp {
-  const fieldPattern = /(\w+):\s(Int|ID|BigInt)!?\s+/;
-  return new RegExp(fieldPattern.source + autoIncrementTag.source);
-}
