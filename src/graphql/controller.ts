@@ -220,7 +220,6 @@ export class GqlEntityController {
           const directives = field.astNode?.directives ?? [];
           const autoIncrementDirective = directives.find(dir => dir.name.value === 'autoIncrement');
 
-          //Check if field is declared as autoincrement
           if (autoIncrementDirective) {
             t.increments(field.name, { primaryKey: true });
             tableHasAutoIncrement = true;

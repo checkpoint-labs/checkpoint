@@ -56,29 +56,6 @@ type Vote {
     });
 
     it('should work', async () => {
-      const schema = `
-scalar BigInt
-scalar Decimal
-scalar BigDecimal
-
-type Vote {
-  id: Int!
-  name: String
-  authenticators: [String]
-  big_number: BigInt
-  decimal: Decimal
-  big_decimal: BigDecimal
-}
-  `;
-
-      const controller = new GqlEntityController(schema);
-      const { builder } = await controller.createEntityStores(mockKnex);
-
-      const createQuery = builder.toString();
-      expect(createQuery).toMatchSnapshot();
-    });
-
-    it('should work with autoincrement and nested objects', async () => {
       let schema = `
 scalar BigInt
 scalar Decimal
