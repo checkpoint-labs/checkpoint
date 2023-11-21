@@ -19,6 +19,11 @@
   },
   "prettier": "@snapshot-labs/prettier-config",
   "dependencies": {
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/address": "^5.7.0",
+    "@ethersproject/keccak256": "^5.7.0",
+    "@ethersproject/providers": "^5.7.2",
+    "@ethersproject/strings": "^5.7.0",
     "@graphql-tools/schema": "^8.5.1",
     "bluebird": "^3.7.2",
     "connection-string": "^4.3.5",
