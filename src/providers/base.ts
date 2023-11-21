@@ -3,10 +3,9 @@ import Checkpoint from '../checkpoint';
 import { CheckpointRecord } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
 import { AsyncMySqlPool } from '../mysql';
-import { CheckpointConfig, CheckpointWriters, ContractSourceConfig } from '../types';
+import { CheckpointConfig, ContractSourceConfig } from '../types';
 
-type Instance = {
-  writer: CheckpointWriters;
+export type Instance = {
   config: CheckpointConfig;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
   setLastIndexedBlock(blockNum: number);
@@ -76,7 +75,28 @@ export class BaseProvider {
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
     throw new Error(
-      `getEventsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
+      `getCheckpointsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
     );
+  }
+}
+
+export class BaseIndexer {
+  protected provider?: BaseProvider;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  init({ instance, log, abis }: { instance: Instance; log: Logger; abis?: Record<string, any> }) {
+    throw new Error('init method was not defined');
+  }
+
+  public getProvider() {
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+
+    return this.provider;
+  }
+
+  public getHandlers(): string[] {
+    throw new Error('getHandlers method was not defined');
   }
 }

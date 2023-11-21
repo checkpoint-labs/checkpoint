@@ -6,7 +6,8 @@ import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
+import { BlockNotFoundError } from './providers';
+import { EvmIndexer } from './providers/evm/indexer';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
@@ -15,13 +16,7 @@ import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
 import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
-import {
-  ContractSourceConfig,
-  CheckpointConfig,
-  CheckpointOptions,
-  CheckpointWriters,
-  TemplateSource
-} from './types';
+import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
 
 const BLOCK_PRELOAD = 100;
 const BLOCK_PRELOAD_OFFSET = 50;
@@ -29,13 +24,12 @@ const DEFAULT_FETCH_INTERVAL = 2000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
-  public writer: CheckpointWriters;
   public opts?: CheckpointOptions;
   public schema: string;
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
-  private readonly networkProvider: BaseProvider;
+  private readonly indexer: EvmIndexer;
 
   private dbConnection: string;
   private knex: Knex;
@@ -50,7 +44,7 @@ export default class Checkpoint {
 
   constructor(
     config: CheckpointConfig,
-    writer: CheckpointWriters,
+    indexer: EvmIndexer,
     schema: string,
     opts?: CheckpointOptions
   ) {
@@ -60,11 +54,8 @@ export default class Checkpoint {
     }
 
     this.config = config;
-    this.writer = writer;
     this.opts = opts;
     this.schema = extendSchema(schema);
-
-    this.validateConfig();
 
     this.entityController = new GqlEntityController(this.schema, config);
 
@@ -80,10 +71,18 @@ export default class Checkpoint {
         : {})
     });
 
-    const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
-    this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
+    this.indexer = indexer;
+    this.indexer.init({
+      instance: this,
+      log: this.log,
+      abis: opts?.abis
+    });
 
-    this.sourceContracts = this.networkProvider.formatAddresses(getContractsFromConfig(config));
+    this.validateConfig();
+
+    this.sourceContracts = this.indexer
+      .getProvider()
+      .formatAddresses(getContractsFromConfig(config));
     this.cpBlocksCache = [];
 
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
@@ -157,7 +156,7 @@ export default class Checkpoint {
     this.log.debug('starting');
 
     await this.validateStore();
-    await this.networkProvider.init();
+    await this.indexer.getProvider().init();
 
     const templateSources = await this.store.getTemplateSources();
     await Promise.all(
@@ -177,7 +176,7 @@ export default class Checkpoint {
     const lastPrefetchedBlock =
       (await this.store.getMetadataNumber(MetadataId.LastPrefetchedBlock)) ?? blockNum;
     this.prefetchEndBlock =
-      (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
+      (await this.indexer.getProvider().getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
 
     if (!this.config.disable_checkpoints) {
       this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
@@ -225,9 +224,9 @@ export default class Checkpoint {
     if (!this.config.sources) this.config.sources = [];
 
     this.config.sources.push(source);
-    this.sourceContracts = this.networkProvider.formatAddresses(
-      getContractsFromConfig(this.config)
-    );
+    this.sourceContracts = this.indexer
+      .getProvider()
+      .formatAddresses(getContractsFromConfig(this.config));
     this.cpBlocksCache = [];
   }
 
@@ -336,7 +335,7 @@ export default class Checkpoint {
     }
 
     const toBlock = Math.min(blockNum + BLOCK_PRELOAD, this.prefetchEndBlock);
-    const checkpoints = await this.networkProvider.getCheckpointsRange(blockNum, toBlock);
+    const checkpoints = await this.indexer.getProvider().getCheckpointsRange(blockNum, toBlock);
 
     await this.store.insertCheckpoints(checkpoints);
     await this.store.setMetadata(MetadataId.LastPrefetchedBlock, toBlock);
@@ -374,14 +373,14 @@ export default class Checkpoint {
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
-      const nextBlock = await this.networkProvider.processBlock(blockNum);
+      const nextBlock = await this.indexer.getProvider().processBlock(blockNum);
       await this.store.purgeCheckpointBlocks(blockNum, this.sourceContracts);
 
       return this.next(nextBlock);
     } catch (err) {
       if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
         try {
-          await this.networkProvider.processPool(blockNum);
+          await this.indexer.getProvider().processPool(blockNum);
         } catch (err) {
           this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
         }
@@ -485,7 +484,9 @@ export default class Checkpoint {
     ];
 
     const missingAbis = usedAbis.filter(abi => !this.opts?.abis?.[abi]);
-    const missingWriters = usedWriters.filter(writer => !this.writer[writer.fn]);
+    const missingWriters = usedWriters.filter(
+      writer => !this.indexer.getHandlers().includes(writer.fn)
+    );
 
     if (missingAbis.length > 0) {
       throw new Error(
@@ -503,7 +504,7 @@ export default class Checkpoint {
   }
 
   private async validateStore() {
-    const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
+    const networkIdentifier = await this.indexer.getProvider().getNetworkIdentifier();
     const configChecksum = getConfigChecksum(this.config);
 
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);

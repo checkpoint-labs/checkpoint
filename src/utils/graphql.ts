@@ -1,6 +1,5 @@
 import {
   GraphQLObjectType,
-  GraphQLOutputType,
   GraphQLNonNull,
   isLeafType,
   isListType,
