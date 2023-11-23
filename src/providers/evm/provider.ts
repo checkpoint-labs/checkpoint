@@ -42,7 +42,7 @@ export class EvmProvider extends BaseProvider {
 
   async getNetworkIdentifier(): Promise<string> {
     const result = await this.provider.getNetwork();
-    return `starknet_${result.chainId}`;
+    return `evm_${result.chainId}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
