@@ -12,6 +12,8 @@ type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactio
 type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
+const MAX_BLOCKS_PER_REQUEST = 10;
+
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
   private readonly writers: Record<string, Writer>;
@@ -243,7 +245,7 @@ export class EvmProvider extends BaseProvider {
     const result = [] as Log[];
 
     let currentFrom = fromBlock;
-    let currentTo = toBlock;
+    let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
     while (true) {
       try {
         const logs = await this.provider.getLogs({
@@ -255,7 +257,7 @@ export class EvmProvider extends BaseProvider {
 
         if (currentTo === toBlock) return result;
         currentFrom = currentTo + 1;
-        currentTo = toBlock;
+        currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
       } catch (e: any) {
         if (!e.body) throw e;
 
@@ -263,7 +265,10 @@ export class EvmProvider extends BaseProvider {
         if (body.error.code !== -32005) throw e;
 
         currentFrom = parseInt(body.error.data.from, 16);
-        currentTo = parseInt(body.error.data.to, 16);
+        currentTo = Math.min(
+          parseInt(body.error.data.to, 16),
+          currentFrom + MAX_BLOCKS_PER_REQUEST
+        );
       }
     }
   }
