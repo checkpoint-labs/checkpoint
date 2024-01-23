@@ -233,7 +233,7 @@ export class CheckpointsStore {
     limit = 15
   ): Promise<number[]> {
     const result = await this.knex
-      .select(Fields.Checkpoints.BlockNumber)
+      .distinct(Fields.Checkpoints.BlockNumber)
       .from(Table.Checkpoints)
       .where(Fields.Checkpoints.BlockNumber, '>=', block)
       .whereIn(Fields.Checkpoints.ContractAddress, contracts)
