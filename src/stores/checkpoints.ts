@@ -91,8 +91,8 @@ export class CheckpointsStore {
     if (!hasCheckpointsTable) {
       builder = builder.createTable(Table.Checkpoints, t => {
         t.string(Fields.Checkpoints.Id, CheckpointIdSize).primary();
-        t.bigint(Fields.Checkpoints.BlockNumber).notNullable();
-        t.string(Fields.Checkpoints.ContractAddress, 66).notNullable();
+        t.bigint(Fields.Checkpoints.BlockNumber).notNullable().index();
+        t.string(Fields.Checkpoints.ContractAddress, 66).notNullable().index();
       });
     }
 
