@@ -335,18 +335,30 @@ export default class Checkpoint {
       return;
     }
 
-    const toBlock = Math.min(blockNum + BLOCK_PRELOAD, this.prefetchEndBlock);
-    const checkpoints = await this.networkProvider.getCheckpointsRange(blockNum, toBlock);
+    let nextBlock = blockNum;
+    try {
+      const toBlock = Math.min(blockNum + BLOCK_PRELOAD, this.prefetchEndBlock);
+      const checkpoints = await this.networkProvider.getCheckpointsRange(blockNum, toBlock);
 
-    await this.store.insertCheckpoints(checkpoints);
-    await this.store.setMetadata(MetadataId.LastPrefetchedBlock, toBlock);
+      await this.store.insertCheckpoints(checkpoints);
+      await this.store.setMetadata(MetadataId.LastPrefetchedBlock, toBlock);
 
-    this.log.info(
-      { blockNumber: blockNum, checkpointsLength: checkpoints.length },
-      'checkpoints inserted'
-    );
+      this.log.info(
+        { blockNumber: blockNum, checkpointsLength: checkpoints.length },
+        'checkpoints inserted'
+      );
 
-    this.nextEvents(blockNum + BLOCK_PRELOAD + 1);
+      nextBlock = blockNum + BLOCK_PRELOAD + 1;
+    } catch (e) {
+      this.log.error(
+        { blockNumber: blockNum, err: e },
+        'error occurred during checkpoint fetching'
+      );
+
+      await Promise.delay(10000);
+    }
+
+    this.nextEvents(nextBlock);
   }
 
   private async next(blockNum: number) {
