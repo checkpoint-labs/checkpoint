@@ -16,7 +16,8 @@ import {
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
-  private processedPoolTransactions = new Set();
+  private seenPoolTransactions = new Set();
+  private processedTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
 
   constructor({ instance, log, abis }: ConstructorParameters<typeof BaseProvider>[0]) {
@@ -107,7 +108,7 @@ export class StarknetProvider extends BaseProvider {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
     const txsToCheck = block.transactions.filter(
-      tx => !this.processedPoolTransactions.has(tx.transaction_hash)
+      tx => !this.seenPoolTransactions.has(tx.transaction_hash)
     );
 
     for (const [i, tx] of txsToCheck.entries()) {
@@ -120,7 +121,7 @@ export class StarknetProvider extends BaseProvider {
       );
     }
 
-    this.processedPoolTransactions.clear();
+    this.seenPoolTransactions.clear();
 
     this.log.debug({ blockNumber: block.block_number }, 'handling block done');
   }
@@ -128,7 +129,7 @@ export class StarknetProvider extends BaseProvider {
   private async handlePool(txs: PendingTransaction[], eventsMap: EventsMap, blockNumber: number) {
     this.log.info('handling pool');
 
-    const txsToCheck = txs.filter(tx => !this.processedPoolTransactions.has(tx.transaction_hash));
+    const txsToCheck = txs.filter(tx => !this.seenPoolTransactions.has(tx.transaction_hash));
 
     for (const [i, tx] of txsToCheck.entries()) {
       await this.handleTx(
@@ -139,7 +140,7 @@ export class StarknetProvider extends BaseProvider {
         tx.transaction_hash ? eventsMap[tx.transaction_hash] || [] : []
       );
 
-      this.processedPoolTransactions.add(tx.transaction_hash);
+      this.seenPoolTransactions.add(tx.transaction_hash);
     }
 
     this.log.info('handling pool done');
@@ -154,6 +155,12 @@ export class StarknetProvider extends BaseProvider {
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
+    if (this.processedTransactions.has(tx.transaction_hash)) {
+      this.log.warn({ hash: tx.transaction_hash }, 'transaction already processed');
+      return;
+    }
+
+    let wasTransactionProcessed = false;
     const writerParams = await this.instance.getWriterParams();
 
     if (this.instance.config.tx_fn) {
@@ -163,6 +170,8 @@ export class StarknetProvider extends BaseProvider {
         tx,
         ...writerParams
       });
+
+      wasTransactionProcessed = true;
     }
 
     if (this.instance.config.global_events) {
@@ -191,6 +200,8 @@ export class StarknetProvider extends BaseProvider {
           eventIndex,
           ...writerParams
         });
+
+        wasTransactionProcessed = true;
       }
     }
 
@@ -218,6 +229,8 @@ export class StarknetProvider extends BaseProvider {
           tx,
           ...writerParams
         });
+
+        wasTransactionProcessed = true;
       }
 
       for (const [eventIndex, event] of events.entries()) {
@@ -251,9 +264,15 @@ export class StarknetProvider extends BaseProvider {
                 eventIndex,
                 ...writerParams
               });
+
+              wasTransactionProcessed = true;
             }
           }
         }
+      }
+
+      if (wasTransactionProcessed) {
+        this.processedTransactions.add(tx.transaction_hash);
       }
 
       const nextSources = this.instance.getCurrentSources(blockNumber);
