@@ -199,7 +199,6 @@ export class GqlEntityController {
    *   INDEX name (name)
    * );
    * ```
-   *
    */
   public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
@@ -212,31 +211,40 @@ export class GqlEntityController {
       const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        t.primary(['id']);
+        let tableHasAutoIncrement = false;
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
           if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
-          const sqlType = this.getSqlType(field.type);
 
-          let column =
-            'options' in sqlType
-              ? t[sqlType.name](field.name, ...sqlType.options)
-              : t[sqlType.name](field.name);
+          const directives = field.astNode?.directives ?? [];
+          const autoIncrementDirective = directives.find(dir => dir.name.value === 'autoIncrement');
 
-          if (field.type instanceof GraphQLNonNull) {
-            column = column.notNullable();
-          }
+          if (autoIncrementDirective) {
+            t.increments(field.name, { primaryKey: true });
+            tableHasAutoIncrement = true;
+          } else {
+            const sqlType = this.getSqlType(field.type);
+            let column =
+              'options' in sqlType
+                ? t[sqlType.name](field.name, ...sqlType.options)
+                : t[sqlType.name](field.name);
 
-          if (!['text', 'json'].includes(sqlType.name)) {
-            column.index();
+            if (field.type instanceof GraphQLNonNull) {
+              column = column.notNullable();
+            }
+
+            if (!['text', 'json'].includes(sqlType.name)) {
+              column.index();
+            }
           }
         });
+
+        if (!tableHasAutoIncrement) t.primary(['id']);
       });
     });
 
     await builder;
-
     return { builder };
   }
 

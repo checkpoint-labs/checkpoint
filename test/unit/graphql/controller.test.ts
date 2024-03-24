@@ -1,6 +1,7 @@
 import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import knex from 'knex';
 import { GqlEntityController } from '../../../src/graphql/controller';
+import { extendSchema } from '../../../src/utils/graphql';
 
 describe('GqlEntityController', () => {
   describe('generateQueryFields', () => {
@@ -17,7 +18,6 @@ type Vote {
         name: 'Query',
         fields: queryFields
       });
-
       const schema = printSchema(new GraphQLSchema({ query: querySchema }));
       expect(schema).toMatchSnapshot();
     });
@@ -56,23 +56,33 @@ type Vote {
     });
 
     it('should work', async () => {
-      const controller = new GqlEntityController(`
+      let schema = `
 scalar BigInt
 scalar Decimal
 scalar BigDecimal
 
 type Vote {
-  id: Int!
+  id: Int! @autoIncrement
   name: String
   authenticators: [String]
   big_number: BigInt
   decimal: Decimal
   big_decimal: BigDecimal
+  poster : Poster
 }
-  `);
-      const { builder } = await controller.createEntityStores(mockKnex);
 
-      expect(builder.toString()).toMatchSnapshot();
+type Poster {
+  id: ID! @autoIncrement
+  name: String!
+}
+
+  `;
+
+      schema = extendSchema(schema);
+      const controller = new GqlEntityController(schema);
+      const { builder } = await controller.createEntityStores(mockKnex);
+      const createQuery = builder.toString();
+      expect(createQuery).toMatchSnapshot();
     });
   });
 

@@ -10,8 +10,9 @@ import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
 
 export const extendSchema = (schema: string): string => {
-  return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
-${schema}`;
+  return `directive @derivedFrom(field: String!) on FIELD_DEFINITION 
+  directive @autoIncrement on FIELD_DEFINITION
+  ${schema}`;
 };
 
 /**
