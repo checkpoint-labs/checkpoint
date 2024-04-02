@@ -79,7 +79,9 @@ export class StarknetProvider extends BaseProvider {
     const block = await this.provider.getBlockWithTxs('pending');
     const receipts = await Promise.all(
       block.transactions.map(async tx => {
-        if (!tx.transaction_hash) return null;
+        if (!tx.transaction_hash || this.seenPoolTransactions.has(tx.transaction_hash)) {
+          return null;
+        }
 
         try {
           return await this.provider.getTransactionReceipt(tx.transaction_hash);
@@ -129,9 +131,7 @@ export class StarknetProvider extends BaseProvider {
   private async handlePool(txs: PendingTransaction[], eventsMap: EventsMap, blockNumber: number) {
     this.log.info('handling pool');
 
-    const txsToCheck = txs.filter(tx => !this.seenPoolTransactions.has(tx.transaction_hash));
-
-    for (const [i, tx] of txsToCheck.entries()) {
+    for (const [i, tx] of txs.entries()) {
       await this.handleTx(
         null,
         blockNumber,
