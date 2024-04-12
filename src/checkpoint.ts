@@ -281,13 +281,16 @@ export default class Checkpoint {
 
     const checkpoints: CheckpointRecord[] = [];
 
+    let finalBlock = 0;
     checkpointBlocks.forEach(cp => {
       cp.blocks.forEach(blockNumber => {
+        finalBlock = Math.max(finalBlock, blockNumber);
         checkpoints.push({ blockNumber, contractAddress: cp.contract });
       });
     });
 
     await this.store.insertCheckpoints(checkpoints);
+    await this.store.setMetadata(MetadataId.LastPrefetchedBlock, finalBlock);
   }
 
   public async setLastIndexedBlock(block: number) {
