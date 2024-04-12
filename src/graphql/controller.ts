@@ -28,7 +28,8 @@ import {
   generateQueryForEntity,
   multiEntityQueryName,
   singleEntityQueryName,
-  getNonNullType
+  getNonNullType,
+  getDerivedFromDirective
 } from '../utils/graphql';
 import { CheckpointConfig } from '../types';
 import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
@@ -216,7 +217,13 @@ export class GqlEntityController {
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-          if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) return;
+          if (
+            isListType(fieldType) &&
+            fieldType.ofType instanceof GraphQLObjectType &&
+            getDerivedFromDirective(field)
+          ) {
+            return;
+          }
           const sqlType = this.getSqlType(field.type);
 
           let column =

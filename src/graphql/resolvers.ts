@@ -16,7 +16,7 @@ import {
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import { AsyncMySqlPool } from '../mysql';
-import { getNonNullType } from '../utils/graphql';
+import { getNonNullType, getDerivedFromDirective } from '../utils/graphql';
 import { getTableName } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
@@ -181,6 +181,8 @@ export async function querySingle(
 
 export const getNestedResolver = (columnName: string) =>
   async function queryNested(parent, args, context: ResolverContext, info: GraphQLResolveInfo) {
+    const { knex, getLoader } = context;
+
     const returnType = getNonNullType(info.returnType) as GraphQLList<GraphQLObjectType>;
     const jsonFields = getJsonFields(returnType.ofType);
 
@@ -191,17 +193,23 @@ export const getNestedResolver = (columnName: string) =>
       info.returnType instanceof GraphQLNonNull ? info.returnType.ofType : info.returnType;
     if (!isListType(fieldType)) return [];
 
-    const directives = field.astNode?.directives ?? [];
-    const derivedFromDirective = directives.find(dir => dir.name.value === 'derivedFrom');
+    const derivedFromDirective = getDerivedFromDirective(field);
+
+    let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
-      throw new Error(`field ${field.name} is missing derivedFrom directive`);
-    }
-    const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
-    if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
-      throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
+      result = await knex
+        .select('*')
+        .from(getTableName(columnName))
+        .whereIn('id', parent[info.fieldName]);
+    } else {
+      const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
+      if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
+        throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
+      }
+
+      result = await getLoader(columnName, fieldArgument.value.value).load(parent.id);
     }
 
-    const result = await context.getLoader(columnName, fieldArgument.value.value).load(parent.id);
     return result.map(item => formatItem(item, jsonFields));
   };
 
