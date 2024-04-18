@@ -13,7 +13,7 @@ import {
 } from 'graphql';
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
-import { extendSchema } from './utils/graphql';
+import { extendSchema, getDerivedFromDirective } from './utils/graphql';
 import { CheckpointConfig } from './types';
 
 type TypeInfo = {
@@ -151,7 +151,11 @@ export const codegen = (
     contents += `    super(${modelName}.tableName);\n\n`;
     typeFields.forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-      if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) {
+      if (
+        isListType(fieldType) &&
+        fieldType.ofType instanceof GraphQLObjectType &&
+        getDerivedFromDirective(field)
+      ) {
         return;
       }
 
@@ -180,7 +184,11 @@ export const codegen = (
 
     typeFields.forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
-      if (isListType(fieldType) && fieldType.ofType instanceof GraphQLObjectType) {
+      if (
+        isListType(fieldType) &&
+        fieldType.ofType instanceof GraphQLObjectType &&
+        getDerivedFromDirective(field)
+      ) {
         return;
       }
 

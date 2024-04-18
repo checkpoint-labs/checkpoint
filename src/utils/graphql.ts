@@ -1,10 +1,10 @@
 import {
   GraphQLObjectType,
-  GraphQLOutputType,
   GraphQLNonNull,
   isLeafType,
   isListType,
-  GraphQLScalarType
+  GraphQLScalarType,
+  GraphQLField
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
@@ -78,4 +78,9 @@ export const getNonNullType = <T>(type: T): T => {
   }
 
   return type;
+};
+
+export const getDerivedFromDirective = (field: GraphQLField<any, any>) => {
+  const directives = field.astNode?.directives ?? [];
+  return directives.find(dir => dir.name.value === 'derivedFrom');
 };
