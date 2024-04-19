@@ -83,7 +83,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
             return (
               isScalarType(baseType) ||
               isObjectType(baseType) ||
-              (isListType(baseType) && isScalarType(baseType.ofType))
+              (isListType(baseType) && !getDerivedFromDirective(field))
             );
           })
           .map(field => field.name);
