@@ -4,9 +4,7 @@ exports[`CheckpointsStore createStore should execute correct query 1`] = `
 "create table \`_checkpoints\` (\`id\` varchar(10), \`block_number\` bigint not null, \`contract_address\` varchar(66) not null, primary key (\`id\`));
 create index \`_checkpoints_block_number_index\` on \`_checkpoints\` (\`block_number\`);
 create index \`_checkpoints_contract_address_index\` on \`_checkpoints\` (\`contract_address\`);
-drop table if exists \`_metadatas\`;
 create table \`_metadatas\` (\`id\` varchar(20), \`value\` varchar(128) not null, primary key (\`id\`));
-drop table if exists \`_template_sources\`;
 create table \`_template_sources\` (\`id\` integer not null primary key autoincrement, \`contract_address\` varchar(66), \`start_block\` bigint not null, \`template\` varchar(128) not null)"
 `;
 

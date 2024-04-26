@@ -210,6 +210,7 @@ export class StarknetProvider extends BaseProvider {
 
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
+      let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
       if (
@@ -217,6 +218,7 @@ export class StarknetProvider extends BaseProvider {
         source.deploy_fn &&
         contract === validateAndParseAddress(tx.contract_address)
       ) {
+        foundContractData = true;
         this.log.info(
           { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
           'found deployment transaction'
@@ -237,6 +239,7 @@ export class StarknetProvider extends BaseProvider {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (`0x${hash.starknetKeccak(sourceEvent.name).toString(16)}` === event.keys[0]) {
+              foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
                 'found contract event'
@@ -273,6 +276,12 @@ export class StarknetProvider extends BaseProvider {
 
       if (wasTransactionProcessed) {
         this.processedTransactions.add(tx.transaction_hash);
+      }
+
+      if (foundContractData) {
+        await this.instance.insertCheckpoints([
+          { blockNumber, contractAddress: validateAndParseAddress(source.contract) }
+        ]);
       }
 
       const nextSources = this.instance.getCurrentSources(blockNumber);
@@ -321,7 +330,11 @@ export class StarknetProvider extends BaseProvider {
     }, {});
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+  async getCheckpointsRangeForAddress(
+    fromBlock: number,
+    toBlock: number,
+    address: string
+  ): Promise<CheckpointRecord[]> {
     const events: Event[] = [];
 
     let continuationToken: string | undefined;
@@ -329,6 +342,7 @@ export class StarknetProvider extends BaseProvider {
       const result = await this.provider.getEvents({
         from_block: { block_number: fromBlock },
         to_block: { block_number: toBlock },
+        address: address,
         chunk_size: 1000,
         continuation_token: continuationToken
       });
@@ -342,5 +356,20 @@ export class StarknetProvider extends BaseProvider {
       blockNumber: event.block_number,
       contractAddress: validateAndParseAddress(event.from_address)
     }));
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events: CheckpointRecord[] = [];
+
+    for (const source of this.instance.getCurrentSources(fromBlock)) {
+      const addressEvents = await this.getCheckpointsRangeForAddress(
+        fromBlock,
+        toBlock,
+        source.contract
+      );
+      events.push(...addressEvents);
+    }
+
+    return events;
   }
 }

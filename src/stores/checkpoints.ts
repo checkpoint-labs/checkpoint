@@ -43,7 +43,6 @@ export interface CheckpointRecord {
  */
 export enum MetadataId {
   LastIndexedBlock = 'last_indexed_block',
-  LastPrefetchedBlock = 'last_fetched_block',
   NetworkIdentifier = 'network_identifier',
   StartBlock = 'start_block',
   ConfigChecksum = 'config_checksum'
@@ -97,21 +96,19 @@ export class CheckpointsStore {
     }
 
     if (!hasMetadataTable) {
-      builder = builder.dropTableIfExists(Table.Metadata).createTable(Table.Metadata, t => {
+      builder = builder.createTable(Table.Metadata, t => {
         t.string(Fields.Metadata.Id, 20).primary();
         t.string(Fields.Metadata.Value, 128).notNullable();
       });
     }
 
     if (!hasTemplateSourcesTable) {
-      builder = builder
-        .dropTableIfExists(Table.TemplateSources)
-        .createTable(Table.TemplateSources, t => {
-          t.increments(Fields.TemplateSources.Id);
-          t.string(Fields.TemplateSources.ContractAddress, 66);
-          t.bigint(Fields.TemplateSources.StartBlock).notNullable();
-          t.string(Fields.TemplateSources.Template, 128).notNullable();
-        });
+      builder = builder.createTable(Table.TemplateSources, t => {
+        t.increments(Fields.TemplateSources.Id);
+        t.string(Fields.TemplateSources.ContractAddress, 66);
+        t.bigint(Fields.TemplateSources.StartBlock).notNullable();
+        t.string(Fields.TemplateSources.Template, 128).notNullable();
+      });
     }
 
     await builder;
@@ -122,7 +119,7 @@ export class CheckpointsStore {
   }
 
   /**
-   * Truncates core database tables.
+   * Recreates core database tables.
    *
    * Calling it will cause all checkpoints to be deleted and will force
    * syncing to start from start.
@@ -136,18 +133,20 @@ export class CheckpointsStore {
     const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
 
     if (hasCheckpointsTable) {
-      await this.knex(Table.Checkpoints).truncate();
+      await this.knex.schema.dropTable(Table.Checkpoints);
     }
 
     if (hasMetadataTable) {
-      await this.knex(Table.Metadata).truncate();
+      await this.knex.schema.dropTable(Table.Metadata);
     }
 
     if (hasTemplateSourcesTable) {
-      await this.knex(Table.TemplateSources).truncate();
+      await this.knex.schema.dropTable(Table.TemplateSources);
     }
 
-    this.log.debug('checkpoints tables truncated');
+    this.log.debug('checkpoints tables dropped');
+
+    await this.createStore();
   }
 
   public async getMetadata(id: string): Promise<string | null> {
@@ -243,29 +242,6 @@ export class CheckpointsStore {
     this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
 
     return result.map(value => Number(value[Fields.Checkpoints.BlockNumber]));
-  }
-
-  /**
-   * Remove all checkpoint blocks lower or equal to specified block number
-   * that are not related to the contracts in the list.
-   * @param block
-   * @param contracts
-   */
-  public async purgeCheckpointBlocks(block: number, contracts: string[]) {
-    try {
-      await this.knex
-        .table(Table.Checkpoints)
-        .where(Fields.Checkpoints.BlockNumber, '<=', block)
-        .whereNotIn(Fields.Checkpoints.ContractAddress, contracts)
-        .del();
-    } catch (err: any) {
-      if (err.code === 'ER_LOCK_DEADLOCK') {
-        this.log.debug('deadlock detected, retrying...');
-        return this.purgeCheckpointBlocks(block, contracts);
-      }
-
-      throw err;
-    }
   }
 
   public async insertTemplateSource(
