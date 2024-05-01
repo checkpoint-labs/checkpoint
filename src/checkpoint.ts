@@ -23,7 +23,7 @@ import {
   TemplateSource
 } from './types';
 
-const BLOCK_PRELOAD = 100;
+const BLOCK_PRELOAD = 1000;
 const BLOCK_PRELOAD_OFFSET = 50;
 const DEFAULT_FETCH_INTERVAL = 2000;
 
@@ -43,9 +43,8 @@ export default class Checkpoint {
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
-  private sourceContracts: string[];
-  private prefetchDone = false;
-  private prefetchEndBlock: number | null = null;
+  private preloadedBlocks: number[] = [];
+  private preloadEndBlock = 0;
   private cpBlocksCache: number[] | null;
 
   constructor(
@@ -83,7 +82,6 @@ export default class Checkpoint {
     const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
     this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
 
-    this.sourceContracts = this.networkProvider.formatAddresses(getContractsFromConfig(config));
     this.cpBlocksCache = [];
 
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
@@ -140,6 +138,10 @@ export default class Checkpoint {
     return getGraphQL(schema, this.getBaseContext(), this.entityController.generateSampleQuery());
   }
 
+  public get sourceContracts() {
+    return this.networkProvider.formatAddresses(getContractsFromConfig(this.config));
+  }
+
   public getCurrentSources(blockNumber: number) {
     if (!this.config.sources) return [];
 
@@ -174,14 +176,8 @@ export default class Checkpoint {
     );
 
     const blockNum = await this.getStartBlockNum();
-    const lastPrefetchedBlock =
-      (await this.store.getMetadataNumber(MetadataId.LastPrefetchedBlock)) ?? blockNum;
-    this.prefetchEndBlock =
+    this.preloadEndBlock =
       (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
-
-    if (!this.config.disable_checkpoints) {
-      this.nextEvents(Math.max(lastPrefetchedBlock, blockNum));
-    }
 
     return await this.next(blockNum);
   }
@@ -225,9 +221,6 @@ export default class Checkpoint {
     if (!this.config.sources) this.config.sources = [];
 
     this.config.sources.push(source);
-    this.sourceContracts = this.networkProvider.formatAddresses(
-      getContractsFromConfig(this.config)
-    );
     this.cpBlocksCache = [];
   }
 
@@ -285,19 +278,21 @@ export default class Checkpoint {
     checkpointBlocks.forEach(cp => {
       cp.blocks.forEach(blockNumber => {
         finalBlock = Math.max(finalBlock, blockNumber);
-        checkpoints.push({ blockNumber, contractAddress: cp.contract });
+        checkpoints.push({
+          blockNumber,
+          contractAddress: cp.contract
+        });
       });
     });
 
     await this.store.insertCheckpoints(checkpoints);
-    await this.store.setMetadata(MetadataId.LastPrefetchedBlock, finalBlock);
   }
 
   public async setLastIndexedBlock(block: number) {
     await this.store.setMetadata(MetadataId.LastIndexedBlock, block);
   }
 
-  public async insertCheckpoints(checkpoints: { blockNumber: number; contractAddress: string }[]) {
+  public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
     await this.store.insertCheckpoints(checkpoints);
   }
 
@@ -331,68 +326,51 @@ export default class Checkpoint {
     return nextBlock > start ? nextBlock : start;
   }
 
-  private async nextEvents(blockNum: number) {
-    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
-    if (blockNum > this.prefetchEndBlock) {
-      this.prefetchDone = true;
-      return;
+  private async preload(blockNum: number) {
+    if (this.preloadedBlocks.length > 0) return this.preloadedBlocks.shift() as number;
+
+    let currentBlock = blockNum;
+
+    while (currentBlock <= this.preloadEndBlock) {
+      const endBlock = Math.min(currentBlock + BLOCK_PRELOAD, this.preloadEndBlock);
+      const checkpoints = await this.networkProvider.getCheckpointsRange(currentBlock, endBlock);
+
+      if (checkpoints.length > 0) {
+        this.preloadedBlocks = checkpoints.map(cp => cp.blockNumber).sort();
+        return this.preloadedBlocks.shift() as number;
+      }
+
+      currentBlock = endBlock + 1;
     }
 
-    let nextBlock = blockNum;
-    try {
-      const toBlock = Math.min(blockNum + BLOCK_PRELOAD, this.prefetchEndBlock);
-      const checkpoints = await this.networkProvider.getCheckpointsRange(blockNum, toBlock);
-
-      await this.store.insertCheckpoints(checkpoints);
-      await this.store.setMetadata(MetadataId.LastPrefetchedBlock, toBlock);
-
-      this.log.info(
-        { blockNumber: blockNum, checkpointsLength: checkpoints.length },
-        'checkpoints inserted'
-      );
-
-      nextBlock = blockNum + BLOCK_PRELOAD + 1;
-    } catch (e) {
-      this.log.error(
-        { blockNumber: blockNum, err: e },
-        'error occurred during checkpoint fetching'
-      );
-
-      await Promise.delay(10000);
-    }
-
-    this.nextEvents(nextBlock);
+    return null;
   }
 
   private async next(blockNum: number) {
-    if (!this.prefetchEndBlock) throw new Error('prefetchEndBlock is not set');
-
     let checkpointBlock;
-    if (!this.config.disable_checkpoints && !this.config.tx_fn && !this.config.global_events) {
-      if (blockNum <= this.prefetchEndBlock) {
-        checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+    if (!this.config.tx_fn && !this.config.global_events) {
+      checkpointBlock = await this.getNextCheckpointBlock(blockNum);
 
-        if (checkpointBlock) {
-          blockNum = checkpointBlock;
-        } else {
-          if (this.prefetchDone) {
-            return this.next(this.prefetchEndBlock + 1);
-          }
-
-          this.log.info({ blockNumber: blockNum }, 'no more checkpoint blocks. waiting');
-          await Promise.delay(10000);
-          return this.next(blockNum);
-        }
+      if (checkpointBlock) {
+        blockNum = checkpointBlock;
+      } else if (blockNum <= this.preloadEndBlock) {
+        const preloadedBlock = await this.preload(blockNum);
+        blockNum = preloadedBlock || this.preloadEndBlock + 1;
       }
     }
 
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
-      const nextBlock = await this.networkProvider.processBlock(blockNum);
-      await this.store.purgeCheckpointBlocks(blockNum, this.sourceContracts);
+      const initialSources = this.getCurrentSources(blockNum);
+      const nextBlockNumber = await this.networkProvider.processBlock(blockNum);
+      const sources = this.getCurrentSources(nextBlockNumber);
 
-      return this.next(nextBlock);
+      if (initialSources.length !== sources.length) {
+        this.preloadedBlocks = [];
+      }
+
+      return this.next(nextBlockNumber);
     } catch (err) {
       if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
         try {

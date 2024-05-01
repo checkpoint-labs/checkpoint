@@ -21,7 +21,6 @@ export const contractTemplateSchema = z.object({
 export const checkpointConfigSchema = z.object({
   network_node_url: z.string().url(),
   optimistic_indexing: z.boolean().optional(),
-  disable_checkpoints: z.boolean().optional(),
   decimal_types: z
     .record(
       z.object({

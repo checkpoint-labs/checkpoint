@@ -10,7 +10,7 @@ type Instance = {
   config: CheckpointConfig;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
   setLastIndexedBlock(blockNum: number);
-  insertCheckpoints(checkpoints: { blockNumber: number; contractAddress: string }[]);
+  insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterParams(): Promise<{
     instance: Checkpoint;
     mysql: AsyncMySqlPool;
