@@ -372,11 +372,13 @@ export default class Checkpoint {
 
       return this.next(nextBlockNumber);
     } catch (err) {
-      if (this.config.optimistic_indexing && err instanceof BlockNotFoundError) {
-        try {
-          await this.networkProvider.processPool(blockNum);
-        } catch (err) {
-          this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
+      if (err instanceof BlockNotFoundError) {
+        if (this.config.optimistic_indexing) {
+          try {
+            await this.networkProvider.processPool(blockNum);
+          } catch (err) {
+            this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
+          }
         }
       } else {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
