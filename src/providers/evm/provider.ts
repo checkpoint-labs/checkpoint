@@ -12,7 +12,7 @@ type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactio
 type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
-const MAX_BLOCKS_PER_REQUEST = 10;
+const MAX_BLOCKS_PER_REQUEST = 100;
 
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
@@ -241,7 +241,7 @@ export class EvmProvider extends BaseProvider {
     }, {});
   }
 
-  async getLogs(fromBlock: number, toBlock: number) {
+  async getLogs(fromBlock: number, toBlock: number, address: string) {
     const result = [] as Log[];
 
     let currentFrom = fromBlock;
@@ -250,12 +250,13 @@ export class EvmProvider extends BaseProvider {
       try {
         const logs = await this.provider.getLogs({
           fromBlock: currentFrom,
-          toBlock: currentTo
+          toBlock: currentTo,
+          address
         });
 
         result.push(...logs);
 
-        if (currentTo === toBlock) return result;
+        if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
         currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
       } catch (e: any) {
@@ -271,14 +272,21 @@ export class EvmProvider extends BaseProvider {
         );
       }
     }
-  }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const logs = await this.getLogs(fromBlock, toBlock);
-
-    return logs.map(log => ({
+    return result.map(log => ({
       blockNumber: log.blockNumber,
       contractAddress: log.address
     }));
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events: CheckpointRecord[] = [];
+
+    for (const source of this.instance.getCurrentSources(fromBlock)) {
+      const addressEvents = await this.getLogs(fromBlock, toBlock, source.contract);
+      events.push(...addressEvents);
+    }
+
+    return events;
   }
 }
