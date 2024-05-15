@@ -6,8 +6,7 @@ import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BlockNotFoundError } from './providers';
-import { EvmIndexer } from './providers/evm/indexer';
+import { BaseIndexer, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
@@ -32,7 +31,7 @@ export default class Checkpoint {
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
-  private readonly indexer: EvmIndexer;
+  private readonly indexer: BaseIndexer;
 
   private dbConnection: string;
   private knex: Knex;
@@ -47,7 +46,7 @@ export default class Checkpoint {
 
   constructor(
     config: CheckpointConfig,
-    indexer: EvmIndexer,
+    indexer: BaseIndexer,
     schema: string,
     opts?: CheckpointOptions
   ) {
