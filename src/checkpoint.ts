@@ -18,7 +18,10 @@ import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
 
-const BLOCK_PRELOAD = 100;
+const BLOCK_PRELOAD_START_RANGE = 1000;
+const BLOCK_RELOAD_MIN_RANGE = 10;
+const BLOCK_PRELOAD_STEP = 100;
+const BLOCK_PRELOAD_TARGET = 10;
 const BLOCK_PRELOAD_OFFSET = 50;
 const DEFAULT_FETCH_INTERVAL = 2000;
 
@@ -37,6 +40,7 @@ export default class Checkpoint {
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
+  private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
   private cpBlocksCache: number[] | null;
@@ -329,10 +333,14 @@ export default class Checkpoint {
     let currentBlock = blockNum;
 
     while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(currentBlock + BLOCK_PRELOAD, this.preloadEndBlock);
+      const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
       const checkpoints = await this.indexer
         .getProvider()
         .getCheckpointsRange(currentBlock, endBlock);
+
+      const increase =
+        checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
+      this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
 
       if (checkpoints.length > 0) {
         this.preloadedBlocks = checkpoints.map(cp => cp.blockNumber).sort();

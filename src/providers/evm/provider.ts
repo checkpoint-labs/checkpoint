@@ -12,8 +12,7 @@ type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactio
 type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
-const MAX_BLOCKS_PER_REQUEST = 100;
-
+const MAX_BLOCKS_PER_REQUEST = 10000;
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
   private readonly writers: Record<string, Writer>;
