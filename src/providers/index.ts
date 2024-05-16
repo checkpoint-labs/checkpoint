@@ -1,2 +1,3 @@
 export * from './base';
-export * from './starknet';
+export * as starknet from './starknet';
+export * as evm from './evm';

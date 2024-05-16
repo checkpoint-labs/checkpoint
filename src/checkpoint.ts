@@ -6,7 +6,7 @@ import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BaseProvider, StarknetProvider, BlockNotFoundError } from './providers';
+import { BaseIndexer, BlockNotFoundError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
@@ -15,27 +15,23 @@ import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
 import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
-import {
-  ContractSourceConfig,
-  CheckpointConfig,
-  CheckpointOptions,
-  CheckpointWriters,
-  TemplateSource
-} from './types';
+import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
 
-const BLOCK_PRELOAD = 1000;
+const BLOCK_PRELOAD_START_RANGE = 1000;
+const BLOCK_RELOAD_MIN_RANGE = 10;
+const BLOCK_PRELOAD_STEP = 100;
+const BLOCK_PRELOAD_TARGET = 10;
 const BLOCK_PRELOAD_OFFSET = 50;
 const DEFAULT_FETCH_INTERVAL = 2000;
 
 export default class Checkpoint {
   public config: CheckpointConfig;
-  public writer: CheckpointWriters;
   public opts?: CheckpointOptions;
   public schema: string;
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
-  private readonly networkProvider: BaseProvider;
+  private readonly indexer: BaseIndexer;
 
   private dbConnection: string;
   private knex: Knex;
@@ -43,13 +39,14 @@ export default class Checkpoint {
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
+  private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
   private cpBlocksCache: number[] | null;
 
   constructor(
     config: CheckpointConfig,
-    writer: CheckpointWriters,
+    indexer: BaseIndexer,
     schema: string,
     opts?: CheckpointOptions
   ) {
@@ -59,11 +56,8 @@ export default class Checkpoint {
     }
 
     this.config = config;
-    this.writer = writer;
     this.opts = opts;
     this.schema = extendSchema(schema);
-
-    this.validateConfig();
 
     this.entityController = new GqlEntityController(this.schema, config);
 
@@ -79,8 +73,14 @@ export default class Checkpoint {
         : {})
     });
 
-    const NetworkProvider = opts?.NetworkProvider || StarknetProvider;
-    this.networkProvider = new NetworkProvider({ instance: this, log: this.log, abis: opts?.abis });
+    this.indexer = indexer;
+    this.indexer.init({
+      instance: this,
+      log: this.log,
+      abis: opts?.abis
+    });
+
+    this.validateConfig();
 
     this.cpBlocksCache = [];
 
@@ -139,7 +139,7 @@ export default class Checkpoint {
   }
 
   public get sourceContracts() {
-    return this.networkProvider.formatAddresses(getContractsFromConfig(this.config));
+    return this.indexer.getProvider().formatAddresses(getContractsFromConfig(this.config));
   }
 
   public getCurrentSources(blockNumber: number) {
@@ -159,7 +159,7 @@ export default class Checkpoint {
     this.log.debug('starting');
 
     await this.validateStore();
-    await this.networkProvider.init();
+    await this.indexer.getProvider().init();
 
     const templateSources = await this.store.getTemplateSources();
     await Promise.all(
@@ -177,7 +177,7 @@ export default class Checkpoint {
 
     const blockNum = await this.getStartBlockNum();
     this.preloadEndBlock =
-      (await this.networkProvider.getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
+      (await this.indexer.getProvider().getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
 
     return await this.next(blockNum);
   }
@@ -332,8 +332,14 @@ export default class Checkpoint {
     let currentBlock = blockNum;
 
     while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(currentBlock + BLOCK_PRELOAD, this.preloadEndBlock);
-      const checkpoints = await this.networkProvider.getCheckpointsRange(currentBlock, endBlock);
+      const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
+      const checkpoints = await this.indexer
+        .getProvider()
+        .getCheckpointsRange(currentBlock, endBlock);
+
+      const increase =
+        checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
+      this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
 
       if (checkpoints.length > 0) {
         this.preloadedBlocks = checkpoints.map(cp => cp.blockNumber).sort();
@@ -363,7 +369,7 @@ export default class Checkpoint {
 
     try {
       const initialSources = this.getCurrentSources(blockNum);
-      const nextBlockNumber = await this.networkProvider.processBlock(blockNum);
+      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum);
       const sources = this.getCurrentSources(nextBlockNumber);
 
       if (initialSources.length !== sources.length) {
@@ -375,7 +381,7 @@ export default class Checkpoint {
       if (err instanceof BlockNotFoundError) {
         if (this.config.optimistic_indexing) {
           try {
-            await this.networkProvider.processPool(blockNum);
+            await this.indexer.getProvider().processPool(blockNum);
           } catch (err) {
             this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
           }
@@ -480,7 +486,9 @@ export default class Checkpoint {
     ];
 
     const missingAbis = usedAbis.filter(abi => !this.opts?.abis?.[abi]);
-    const missingWriters = usedWriters.filter(writer => !this.writer[writer.fn]);
+    const missingWriters = usedWriters.filter(
+      writer => !this.indexer.getHandlers().includes(writer.fn)
+    );
 
     if (missingAbis.length > 0) {
       throw new Error(
@@ -498,7 +506,7 @@ export default class Checkpoint {
   }
 
   private async validateStore() {
-    const networkIdentifier = await this.networkProvider.getNetworkIdentifier();
+    const networkIdentifier = await this.indexer.getProvider().getNetworkIdentifier();
     const configChecksum = getConfigChecksum(this.config);
 
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
