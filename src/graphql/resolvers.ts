@@ -20,6 +20,30 @@ import { getTableName } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
 
+type BaseArgs = {
+  block?: number;
+};
+
+type SingleEntitySource = Record<string, any> & {
+  _args: BaseArgs;
+};
+
+type Result = Record<string, any> & {
+  _args?: BaseArgs;
+};
+
+type SingleEntityResolverArgs = BaseArgs & {
+  id: string;
+};
+
+type MultiEntityResolverArgs = BaseArgs & {
+  first?: number;
+  skip?: number;
+  orderBy?: string;
+  orderDirection?: string;
+  where?: Record<string, any>;
+};
+
 export type ResolverContextInput = {
   log: Logger;
   knex: Knex;
@@ -27,12 +51,18 @@ export type ResolverContextInput = {
 };
 
 export type ResolverContext = ResolverContextInput & {
-  getLoader: (name: string, field?: string) => DataLoader<readonly unknown[], any>;
+  getLoader: (name: string, field?: string, block?: number) => DataLoader<readonly unknown[], any>;
 };
 
-export async function queryMulti(parent, args, context: ResolverContext, info) {
+export async function queryMulti(
+  parent: undefined,
+  args: MultiEntityResolverArgs,
+  context: ResolverContext,
+  info: GraphQLResolveInfo
+): Promise<Result[]> {
   const { log, knex } = context;
 
+  if (!isListType(info.returnType)) throw new Error('unexpected return type');
   const returnType = info.returnType.ofType as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
@@ -41,6 +71,10 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
+  query = args.block
+    ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [args.block])
+    : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
+
   const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
     Object.entries(where).map((w: [string, any]) => {
       // TODO: we could generate where as objects { name, column, operator, value }
@@ -97,6 +131,10 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
           .columns(nestedEntitiesMappings[fieldName])
           .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
 
+        query = args.block
+          ? query.andWhereRaw(`${nestedTableName}.block_range @> int8(??)`, [args.block])
+          : query.andWhereRaw(`upper_inf(${nestedTableName}.block_range)`);
+
         handleWhere(query, nestedTableName, w[1]);
       } else {
         query = query.where(`${prefix}.${w[0]}`, w[1]);
@@ -135,17 +173,22 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 
     return {
       ...formatItem(item, jsonFields),
-      ...nested
+      ...nested,
+      _args: {
+        block: args.block
+      }
     };
   });
 }
 
 export async function querySingle(
-  parent,
-  args,
+  parent: SingleEntitySource | undefined,
+  args: SingleEntityResolverArgs,
   context: ResolverContext,
   info: GraphQLResolveInfo
-) {
+): Promise<Result | null> {
+  const block = parent?._args.block ?? args.block;
+
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
@@ -154,7 +197,10 @@ export async function querySingle(
   if (currentValue === null) return null;
   const alreadyResolvedInParent = typeof currentValue === 'object';
   if (alreadyResolvedInParent) {
-    return formatItem(currentValue, jsonFields);
+    return {
+      ...formatItem(currentValue, jsonFields),
+      _args: { block }
+    };
   }
 
   const id = currentValue || args.id;
@@ -165,21 +211,32 @@ export async function querySingle(
     const simplified = simplifyParsedResolveInfoFragmentWithType(parsed, returnType);
 
     if (Object.keys(simplified.fields).length === 1 && simplified.fields['id']) {
-      return { id };
+      return { id, _args: { block } };
     }
   }
 
-  const items = await context.getLoader(returnType.name.toLowerCase()).load(id);
+  const items = await context.getLoader(returnType.name.toLowerCase(), 'id', block).load(id);
   if (items.length === 0) {
     throw new Error(`Row not found: ${id}`);
   }
 
-  return formatItem(items[0], jsonFields);
+  return {
+    ...formatItem(items[0], jsonFields),
+    _args: { block }
+  };
 }
 
-export const getNestedResolver = (columnName: string) =>
-  async function queryNested(parent, args, context: ResolverContext, info: GraphQLResolveInfo) {
+export const getNestedResolver =
+  (columnName: string) =>
+  async (
+    parent: Result,
+    args: unknown,
+    context: ResolverContext,
+    info: GraphQLResolveInfo
+  ): Promise<Result[]> => {
     const { knex, getLoader } = context;
+
+    const block = parent._args?.block;
 
     const returnType = getNonNullType(info.returnType) as GraphQLList<GraphQLObjectType>;
     const jsonFields = getJsonFields(returnType.ofType);
@@ -195,20 +252,28 @@ export const getNestedResolver = (columnName: string) =>
 
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
-      result = await knex
+      let query = knex
         .select('*')
         .from(getTableName(columnName))
         .whereIn('id', parent[info.fieldName]);
+      query = block
+        ? query.andWhereRaw('block_range @> int8(??)', [block])
+        : query.andWhereRaw('upper_inf(block_range)');
+
+      result = await query;
     } else {
       const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
       if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
         throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
       }
 
-      result = await getLoader(columnName, fieldArgument.value.value).load(parent.id);
+      result = await getLoader(columnName, fieldArgument.value.value, block).load(parent.id);
     }
 
-    return result.map(item => formatItem(item, jsonFields));
+    return result.map(item => ({
+      ...formatItem(item, jsonFields),
+      _args: { block }
+    }));
   };
 
 function getJsonFields(type: GraphQLObjectType) {

@@ -364,6 +364,8 @@ export default class Checkpoint {
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
+      register.setCurrentBlock(BigInt(blockNum));
+
       const initialSources = this.getCurrentSources(blockNum);
       const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum);
       const sources = this.getCurrentSources(nextBlockNumber);

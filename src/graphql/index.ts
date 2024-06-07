@@ -20,15 +20,18 @@ import { getTableName } from '../utils/database';
 export const createGetLoader = (context: ResolverContextInput) => {
   const loaders = {};
 
-  return (name: string, field = 'id') => {
+  return (name: string, field = 'id', block?: number) => {
     const key = `${name}-${field}`;
 
     if (!loaders[key]) {
       loaders[key] = new DataLoader(async ids => {
-        const query = context.knex
+        let query = context.knex
           .select('*')
           .from(getTableName(name))
           .whereIn(field, ids as string[]);
+        query = block
+          ? query.andWhereRaw('block_range @> int8(??)', [block])
+          : query.andWhereRaw('upper_inf(block_range)');
 
         context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
 

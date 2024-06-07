@@ -32,7 +32,7 @@
     "graphql-fields": "^2.0.3",
     "graphql-parse-resolve-info": "^4.12.3",
     "json-to-graphql-query": "^2.2.4",
-    "knex": "^2.4.2",
+    "knex": "^3.1.0",
     "object-hash": "^3.0.0",
     "pg": "^8.10.0",
     "pino": "^8.3.1",
