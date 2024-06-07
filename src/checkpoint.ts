@@ -1,4 +1,3 @@
-import Promise from 'bluebird';
 import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import { Knex } from 'knex';
@@ -11,10 +10,10 @@ import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
-import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
 import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
+import { sleep } from './utils/helpers';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
 
 const BLOCK_PRELOAD_START_RANGE = 1000;
@@ -35,7 +34,6 @@ export default class Checkpoint {
 
   private dbConnection: string;
   private knex: Knex;
-  private mysqlPool?: AsyncMySqlPool;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
@@ -101,7 +99,6 @@ export default class Checkpoint {
     return {
       log: this.log.child({ component: 'resolver' }),
       knex: this.knex,
-      mysql: this.mysql,
       pg: this.pg
     };
   }
@@ -299,12 +296,11 @@ export default class Checkpoint {
   public async getWriterParams(): Promise<{
     instance: Checkpoint;
     knex: Knex;
-    mysql: AsyncMySqlPool;
     pg: PgPool;
   }> {
     return {
       instance: this,
-      mysql: this.mysql,
+      knex: this.knex,
       pg: this.pg
     };
   }
@@ -394,14 +390,14 @@ export default class Checkpoint {
         this.cpBlocksCache.unshift(checkpointBlock);
       }
 
-      await Promise.delay(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
+      await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
       return this.next(blockNum);
     }
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
     if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
-      return this.cpBlocksCache.shift();
+      return this.cpBlocksCache.shift() || null;
     }
 
     const checkpointBlocks = await this.store.getNextCheckpointBlocks(
@@ -413,7 +409,7 @@ export default class Checkpoint {
     if (checkpointBlocks.length === 0) return null;
 
     this.cpBlocksCache = checkpointBlocks;
-    return this.cpBlocksCache.shift();
+    return this.cpBlocksCache.shift() || null;
   }
 
   private get store(): CheckpointsStore {
@@ -424,52 +420,13 @@ export default class Checkpoint {
     return (this.checkpointsStore = new CheckpointsStore(this.knex, this.log));
   }
 
-  /**
-   * returns AsyncMySqlPool if mysql client is used, otherwise returns Proxy that
-   * will notify user when used that mysql is not available with other clients
-   */
-  private get mysql(): AsyncMySqlPool {
-    if (this.mysqlPool) {
-      return this.mysqlPool;
-    }
-
-    if (this.knex.client.config.client === 'mysql') {
-      this.mysqlPool = createMySqlPool(this.dbConnection);
-      return this.mysqlPool;
-    }
-
-    return new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('mysql is only accessible when using MySQL database.');
-        }
-      }
-    ) as AsyncMySqlPool;
-  }
-
-  /**
-   * returns pg's Pool if pg client is used, otherwise returns Proxy that
-   * will notify user when used that mysql is not available with other clients
-   */
   private get pg(): PgPool {
     if (this.pgPool) {
       return this.pgPool;
     }
 
-    if (this.knex.client.config.client === 'pg') {
-      this.pgPool = createPgPool(this.dbConnection);
-      return this.pgPool;
-    }
-
-    return new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('pg is only accessible when using PostgreSQL database.');
-        }
-      }
-    ) as PgPool;
+    this.pgPool = createPgPool(this.dbConnection);
+    return this.pgPool;
   }
 
   private validateConfig() {

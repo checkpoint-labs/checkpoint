@@ -20,16 +20,8 @@ export type KnexType =
     };
 
 const PROTOCOLS = {
-  mysql: 'mysql',
   postgres: 'pg',
   postgresql: 'pg'
-};
-
-const EXTRA_OPTIONS = {
-  mysql: {
-    supportBigNumbers: true,
-    bigNumberStrings: true
-  }
 };
 
 export function getConnectionData(connectionString: string) {
@@ -68,8 +60,7 @@ export function getConnectionData(connectionString: string) {
       password: connectionConfig.password,
       host: connectionConfig.hosts[0].name,
       port: connectionConfig.hosts[0].port,
-      ssl: Object.keys(sslConfig).length > 0 ? sslConfig : undefined,
-      ...EXTRA_OPTIONS[client]
+      ssl: Object.keys(sslConfig).length > 0 ? sslConfig : undefined
     }
   };
 }
