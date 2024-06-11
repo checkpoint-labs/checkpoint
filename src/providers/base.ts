@@ -1,4 +1,3 @@
-import { Pool as PgPool } from 'pg';
 import Checkpoint from '../checkpoint';
 import { CheckpointRecord } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
@@ -11,7 +10,6 @@ export type Instance = {
   insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterParams(): Promise<{
     instance: Checkpoint;
-    pg: PgPool;
   }>;
 };
 

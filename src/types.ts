@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { Pool as PgPool } from 'pg';
 import Checkpoint from './checkpoint';
 import { LogLevel } from './utils/logger';
 import {
@@ -41,6 +40,5 @@ export type BaseWriterParams = {
   blockNumber: number;
   eventIndex?: number;
   source?: ContractSourceConfig;
-  pg: PgPool;
   instance: Checkpoint;
 };

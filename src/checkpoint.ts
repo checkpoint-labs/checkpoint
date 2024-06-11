@@ -295,13 +295,9 @@ export default class Checkpoint {
 
   public async getWriterParams(): Promise<{
     instance: Checkpoint;
-    knex: Knex;
-    pg: PgPool;
   }> {
     return {
-      instance: this,
-      knex: this.knex,
-      pg: this.pg
+      instance: this
     };
   }
 
