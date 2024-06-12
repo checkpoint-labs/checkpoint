@@ -71,9 +71,10 @@ export async function queryMulti(
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
-  query = args.block
-    ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [args.block])
-    : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
+  query =
+    args.block !== undefined
+      ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [args.block])
+      : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
 
   const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
     Object.entries(where).map((w: [string, any]) => {
@@ -131,9 +132,10 @@ export async function queryMulti(
           .columns(nestedEntitiesMappings[fieldName])
           .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
 
-        query = args.block
-          ? query.andWhereRaw(`${nestedTableName}.block_range @> int8(??)`, [args.block])
-          : query.andWhereRaw(`upper_inf(${nestedTableName}.block_range)`);
+        query =
+          args.block !== undefined
+            ? query.andWhereRaw(`${nestedTableName}.block_range @> int8(??)`, [args.block])
+            : query.andWhereRaw(`upper_inf(${nestedTableName}.block_range)`);
 
         handleWhere(query, nestedTableName, w[1]);
       } else {
@@ -256,9 +258,10 @@ export const getNestedResolver =
         .select('*')
         .from(getTableName(columnName))
         .whereIn('id', parent[info.fieldName]);
-      query = block
-        ? query.andWhereRaw('block_range @> int8(??)', [block])
-        : query.andWhereRaw('upper_inf(block_range)');
+      query =
+        block !== undefined
+          ? query.andWhereRaw('block_range @> int8(??)', [block])
+          : query.andWhereRaw('upper_inf(block_range)');
 
       result = await query;
     } else {

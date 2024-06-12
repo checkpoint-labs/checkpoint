@@ -29,9 +29,10 @@ export const createGetLoader = (context: ResolverContextInput) => {
           .select('*')
           .from(getTableName(name))
           .whereIn(field, ids as string[]);
-        query = block
-          ? query.andWhereRaw('block_range @> int8(??)', [block])
-          : query.andWhereRaw('upper_inf(block_range)');
+        query =
+          block !== undefined
+            ? query.andWhereRaw('block_range @> int8(??)', [block])
+            : query.andWhereRaw('upper_inf(block_range)');
 
         context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
 
