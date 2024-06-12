@@ -16,6 +16,8 @@ import { register } from './register';
 import { sleep } from './utils/helpers';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
 
+const SCHEMA_VERSION = 1;
+
 const BLOCK_PRELOAD_START_RANGE = 1000;
 const BLOCK_RELOAD_MIN_RANGE = 10;
 const BLOCK_PRELOAD_STEP = 100;
@@ -197,6 +199,7 @@ export default class Checkpoint {
 
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
+    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
 
     await this.entityController.createEntityStores(this.knex);
   }
@@ -209,9 +212,8 @@ export default class Checkpoint {
    *
    */
   public async resetMetadata() {
-    this.log.debug('reset metadata');
-
     await this.store.resetStore();
+    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
   }
 
   private addSource(source: ContractSourceConfig) {
@@ -467,14 +469,16 @@ export default class Checkpoint {
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
     const storedStartBlock = await this.store.getMetadataNumber(MetadataId.StartBlock);
     const storedConfigChecksum = await this.store.getMetadata(MetadataId.ConfigChecksum);
+    const storedSchemaVersion = await this.store.getMetadataNumber(MetadataId.SchemaVersion);
     const hasNetworkChanged =
       storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
     const hasStartBlockChanged =
       storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
     const hasConfigChanged = storedConfigChecksum && storedConfigChecksum !== configChecksum;
+    const hasSchemaChanged = storedSchemaVersion !== SCHEMA_VERSION;
 
     if (
-      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged) &&
+      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged || hasSchemaChanged) &&
       this.opts?.resetOnConfigChange
     ) {
       await this.resetMetadata();
@@ -507,6 +511,14 @@ export default class Checkpoint {
       );
 
       throw new Error('config changed');
+    } else if (hasSchemaChanged) {
+      this.log.error(
+        `schema version changed from ${storedSchemaVersion} to ${SCHEMA_VERSION}.
+          You probably should reset the database by calling .reset() and resetMetadata().
+          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
+      );
+
+      throw new Error('schema changed');
     } else {
       if (!storedNetworkIdentifier) {
         await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
