@@ -32,14 +32,14 @@ import {
   getDerivedFromDirective
 } from '../utils/graphql';
 import { CheckpointConfig } from '../types';
-import { querySingle, queryMulti, ResolverContext, getNestedResolver } from './resolvers';
+import { querySingle, queryMulti, getNestedResolver } from './resolvers';
 
 /**
  * Type for single and multiple query resolvers
  */
-interface EntityQueryResolvers<Context = ResolverContext> {
-  singleEntityResolver: GraphQLFieldResolver<unknown, Context>;
-  multipleEntityResolver: GraphQLFieldResolver<unknown, Context>;
+interface EntityQueryResolvers {
+  singleEntityResolver: typeof querySingle;
+  multipleEntityResolver: typeof queryMulti;
 }
 
 const GraphQLOrderDirection = new GraphQLEnumType({
@@ -213,7 +213,8 @@ export class GqlEntityController {
       const tableName = pluralize(type.name.toLowerCase());
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
-        t.primary(['id']);
+        t.uuid('uid').primary().defaultTo(knex.fn.uuid());
+        t.specificType('block_range', 'int8range').notNullable();
 
         this.getTypeFields(type).forEach(field => {
           const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
@@ -301,7 +302,10 @@ export class GqlEntityController {
     return {
       type,
       args: {
-        id: { type: new GraphQLNonNull(this.getEntityIdType(type)) }
+        id: { type: new GraphQLNonNull(this.getEntityIdType(type)) },
+        block: {
+          type: GraphQLInt
+        }
       },
       resolve: resolver
     };
@@ -424,6 +428,9 @@ export class GqlEntityController {
         },
         orderDirection: {
           type: GraphQLOrderDirection
+        },
+        block: {
+          type: GraphQLInt
         },
         where
       },

@@ -1,8 +1,6 @@
-import { Pool as PgPool } from 'pg';
 import Checkpoint from '../checkpoint';
 import { CheckpointRecord } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
-import { AsyncMySqlPool } from '../mysql';
 import { CheckpointConfig, ContractSourceConfig } from '../types';
 
 export type Instance = {
@@ -12,8 +10,6 @@ export type Instance = {
   insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterParams(): Promise<{
     instance: Checkpoint;
-    mysql: AsyncMySqlPool;
-    pg: PgPool;
   }>;
 };
 

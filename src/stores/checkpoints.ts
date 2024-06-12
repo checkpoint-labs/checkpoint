@@ -45,7 +45,8 @@ export enum MetadataId {
   LastIndexedBlock = 'last_indexed_block',
   NetworkIdentifier = 'network_identifier',
   StartBlock = 'start_block',
-  ConfigChecksum = 'config_checksum'
+  ConfigChecksum = 'config_checksum',
+  SchemaVersion = 'schema_version'
 }
 
 const CheckpointIdSize = 10;

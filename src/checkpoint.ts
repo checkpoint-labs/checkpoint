@@ -1,4 +1,3 @@
-import Promise from 'bluebird';
 import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 import { addResolversToSchema } from '@graphql-tools/schema';
 import { Knex } from 'knex';
@@ -11,11 +10,13 @@ import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
-import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { createPgPool } from './pg';
 import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
+import { sleep } from './utils/helpers';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
+
+const SCHEMA_VERSION = 1;
 
 const BLOCK_PRELOAD_START_RANGE = 1000;
 const BLOCK_RELOAD_MIN_RANGE = 10;
@@ -35,7 +36,6 @@ export default class Checkpoint {
 
   private dbConnection: string;
   private knex: Knex;
-  private mysqlPool?: AsyncMySqlPool;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
   private activeTemplates: TemplateSource[] = [];
@@ -101,7 +101,6 @@ export default class Checkpoint {
     return {
       log: this.log.child({ component: 'resolver' }),
       knex: this.knex,
-      mysql: this.mysql,
       pg: this.pg
     };
   }
@@ -200,6 +199,7 @@ export default class Checkpoint {
 
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
+    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
 
     await this.entityController.createEntityStores(this.knex);
   }
@@ -212,9 +212,8 @@ export default class Checkpoint {
    *
    */
   public async resetMetadata() {
-    this.log.debug('reset metadata');
-
     await this.store.resetStore();
+    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
   }
 
   private addSource(source: ContractSourceConfig) {
@@ -298,14 +297,9 @@ export default class Checkpoint {
 
   public async getWriterParams(): Promise<{
     instance: Checkpoint;
-    knex: Knex;
-    mysql: AsyncMySqlPool;
-    pg: PgPool;
   }> {
     return {
-      instance: this,
-      mysql: this.mysql,
-      pg: this.pg
+      instance: this
     };
   }
 
@@ -368,6 +362,8 @@ export default class Checkpoint {
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
+      register.setCurrentBlock(BigInt(blockNum));
+
       const initialSources = this.getCurrentSources(blockNum);
       const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum);
       const sources = this.getCurrentSources(nextBlockNumber);
@@ -394,14 +390,14 @@ export default class Checkpoint {
         this.cpBlocksCache.unshift(checkpointBlock);
       }
 
-      await Promise.delay(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
+      await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
       return this.next(blockNum);
     }
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
     if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
-      return this.cpBlocksCache.shift();
+      return this.cpBlocksCache.shift() || null;
     }
 
     const checkpointBlocks = await this.store.getNextCheckpointBlocks(
@@ -413,7 +409,7 @@ export default class Checkpoint {
     if (checkpointBlocks.length === 0) return null;
 
     this.cpBlocksCache = checkpointBlocks;
-    return this.cpBlocksCache.shift();
+    return this.cpBlocksCache.shift() || null;
   }
 
   private get store(): CheckpointsStore {
@@ -424,52 +420,13 @@ export default class Checkpoint {
     return (this.checkpointsStore = new CheckpointsStore(this.knex, this.log));
   }
 
-  /**
-   * returns AsyncMySqlPool if mysql client is used, otherwise returns Proxy that
-   * will notify user when used that mysql is not available with other clients
-   */
-  private get mysql(): AsyncMySqlPool {
-    if (this.mysqlPool) {
-      return this.mysqlPool;
-    }
-
-    if (this.knex.client.config.client === 'mysql') {
-      this.mysqlPool = createMySqlPool(this.dbConnection);
-      return this.mysqlPool;
-    }
-
-    return new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('mysql is only accessible when using MySQL database.');
-        }
-      }
-    ) as AsyncMySqlPool;
-  }
-
-  /**
-   * returns pg's Pool if pg client is used, otherwise returns Proxy that
-   * will notify user when used that mysql is not available with other clients
-   */
   private get pg(): PgPool {
     if (this.pgPool) {
       return this.pgPool;
     }
 
-    if (this.knex.client.config.client === 'pg') {
-      this.pgPool = createPgPool(this.dbConnection);
-      return this.pgPool;
-    }
-
-    return new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('pg is only accessible when using PostgreSQL database.');
-        }
-      }
-    ) as PgPool;
+    this.pgPool = createPgPool(this.dbConnection);
+    return this.pgPool;
   }
 
   private validateConfig() {
@@ -512,14 +469,16 @@ export default class Checkpoint {
     const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
     const storedStartBlock = await this.store.getMetadataNumber(MetadataId.StartBlock);
     const storedConfigChecksum = await this.store.getMetadata(MetadataId.ConfigChecksum);
+    const storedSchemaVersion = await this.store.getMetadataNumber(MetadataId.SchemaVersion);
     const hasNetworkChanged =
       storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
     const hasStartBlockChanged =
       storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
     const hasConfigChanged = storedConfigChecksum && storedConfigChecksum !== configChecksum;
+    const hasSchemaChanged = storedSchemaVersion !== SCHEMA_VERSION;
 
     if (
-      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged) &&
+      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged || hasSchemaChanged) &&
       this.opts?.resetOnConfigChange
     ) {
       await this.resetMetadata();
@@ -552,6 +511,14 @@ export default class Checkpoint {
       );
 
       throw new Error('config changed');
+    } else if (hasSchemaChanged) {
+      this.log.error(
+        `schema version changed from ${storedSchemaVersion} to ${SCHEMA_VERSION}.
+          You probably should reset the database by calling .reset() and resetMetadata().
+          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
+      );
+
+      throw new Error('schema changed');
     } else {
       if (!storedNetworkIdentifier) {
         await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);

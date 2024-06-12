@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { Pool as PgPool } from 'pg';
 import Checkpoint from './checkpoint';
-import { AsyncMySqlPool } from './mysql';
 import { LogLevel } from './utils/logger';
 import {
   contractSourceConfigSchema,
@@ -42,7 +40,5 @@ export type BaseWriterParams = {
   blockNumber: number;
   eventIndex?: number;
   source?: ContractSourceConfig;
-  mysql: AsyncMySqlPool;
-  pg: PgPool;
   instance: Checkpoint;
 };

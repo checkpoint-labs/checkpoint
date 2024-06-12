@@ -8,7 +8,7 @@ exports[` 3`] = `"'id' field for type Participant is not a scalar type."`;
 
 exports[`GqlEntityController createEntityStores should work 1`] = `
 "drop table if exists \`votes\`;
-create table \`votes\` (\`id\` integer not null, \`name\` varchar(256), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, primary key (\`id\`));
+create table \`votes\` (\`uid\` char(36) default (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))), \`block_range\` int8range not null, \`id\` integer not null, \`name\` varchar(256), \`authenticators\` json, \`big_number\` bigint, \`decimal\` float, \`big_decimal\` float, primary key (\`uid\`));
 create index \`votes_id_index\` on \`votes\` (\`id\`);
 create index \`votes_name_index\` on \`votes\` (\`name\`);
 create index \`votes_big_number_index\` on \`votes\` (\`big_number\`);
@@ -18,8 +18,8 @@ create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
-  vote(id: Int!): Vote
-  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, where: Vote_filter): [Vote]
+  vote(id: Int!, block: Int): Vote
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, block: Int, where: Vote_filter): [Vote]
 }
 
 type Vote {
