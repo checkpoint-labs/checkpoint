@@ -194,29 +194,28 @@ export async function querySingle(
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
-  const currentValue = parent?.[info.fieldName];
+  const parentResolvedValue = parent?.[info.fieldName];
 
-  if (currentValue === null) return null;
-  const alreadyResolvedInParent = typeof currentValue === 'object';
+  if (parentResolvedValue === null) return null;
+  const alreadyResolvedInParent = typeof parentResolvedValue === 'object';
   if (alreadyResolvedInParent) {
     return {
-      ...formatItem(currentValue, jsonFields),
+      ...formatItem(parentResolvedValue, jsonFields),
       _args: { block }
     };
   }
 
-  const id = currentValue || args.id;
-
   const parsed = parseResolveInfo(info);
-  if (parsed) {
+  if (parsed && parentResolvedValue) {
     // @ts-ignore
     const simplified = simplifyParsedResolveInfoFragmentWithType(parsed, returnType);
 
     if (Object.keys(simplified.fields).length === 1 && simplified.fields['id']) {
-      return { id, _args: { block } };
+      return { id: parentResolvedValue, _args: { block } };
     }
   }
 
+  const id = parentResolvedValue || args.id;
   const items = await context.getLoader(returnType.name.toLowerCase(), 'id', block).load(id);
   if (items.length === 0) {
     throw new Error(`Row not found: ${id}`);
