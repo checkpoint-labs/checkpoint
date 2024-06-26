@@ -9,7 +9,7 @@ import {
 } from 'graphql';
 import DataLoader from 'dataloader';
 import { ResolverContextInput } from './resolvers';
-import { getTableName } from '../utils/database';
+import { getTableName, applyBlockFilter } from '../utils/database';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -25,14 +25,13 @@ export const createGetLoader = (context: ResolverContextInput) => {
 
     if (!loaders[key]) {
       loaders[key] = new DataLoader(async ids => {
+        const tableName = getTableName(name);
+
         let query = context.knex
           .select('*')
-          .from(getTableName(name))
+          .from(tableName)
           .whereIn(field, ids as string[]);
-        query =
-          block !== undefined
-            ? query.andWhereRaw('block_range @> int8(??)', [block])
-            : query.andWhereRaw('upper_inf(block_range)');
+        query = applyBlockFilter(query, tableName, block);
 
         context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
 

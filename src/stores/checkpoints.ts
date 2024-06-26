@@ -49,6 +49,8 @@ export enum MetadataId {
   SchemaVersion = 'schema_version'
 }
 
+export const INTERNAL_TABLES = Object.values(Table);
+
 const CheckpointIdSize = 10;
 
 /**
