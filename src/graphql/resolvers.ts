@@ -16,7 +16,7 @@ import {
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import { getNonNullType, getDerivedFromDirective } from '../utils/graphql';
-import { getTableName } from '../utils/database';
+import { getTableName, applyBlockFilter } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
 
@@ -71,10 +71,7 @@ export async function queryMulti(
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
-  query =
-    args.block !== undefined
-      ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [args.block])
-      : query.andWhereRaw(`upper_inf(${tableName}.block_range)`);
+  query = applyBlockFilter(query, tableName, args.block);
 
   const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
     Object.entries(where).map((w: [string, any]) => {
@@ -132,10 +129,7 @@ export async function queryMulti(
           .columns(nestedEntitiesMappings[fieldName])
           .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
 
-        query =
-          args.block !== undefined
-            ? query.andWhereRaw(`${nestedTableName}.block_range @> int8(??)`, [args.block])
-            : query.andWhereRaw(`upper_inf(${nestedTableName}.block_range)`);
+        query = applyBlockFilter(query, nestedTableName, args.block);
 
         handleWhere(query, nestedTableName, w[1]);
       } else {
@@ -253,16 +247,10 @@ export const getNestedResolver =
 
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
-      let query = knex
-        .select('*')
-        .from(getTableName(columnName))
-        .whereIn('id', parent[info.fieldName]);
-      query =
-        block !== undefined
-          ? query.andWhereRaw('block_range @> int8(??)', [block])
-          : query.andWhereRaw('upper_inf(block_range)');
+      const tableName = getTableName(columnName);
+      const query = knex.select('*').from(tableName).whereIn('id', parent[info.fieldName]);
 
-      result = await query;
+      result = await applyBlockFilter(query, tableName, block);
     } else {
       const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
       if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
