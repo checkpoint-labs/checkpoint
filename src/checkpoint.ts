@@ -336,7 +336,7 @@ export default class Checkpoint {
       this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
 
       if (checkpoints.length > 0) {
-        this.preloadedBlocks = checkpoints.map(cp => cp.blockNumber).sort();
+        this.preloadedBlocks = [...new Set(checkpoints.map(cp => cp.blockNumber).sort())];
         return this.preloadedBlocks.shift() as number;
       }
 
