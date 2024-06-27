@@ -217,7 +217,7 @@ export class StarknetProvider extends BaseProvider {
     }
 
     let lastSources = this.instance.getCurrentSources(blockNumber);
-    const sourcesQueue = [...lastSources];
+    let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
@@ -299,7 +299,7 @@ export class StarknetProvider extends BaseProvider {
         nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
       );
 
-      sourcesQueue.push(...newSources);
+      sourcesQueue = sourcesQueue.concat(newSources);
       lastSources = nextSources;
     }
 
@@ -307,7 +307,7 @@ export class StarknetProvider extends BaseProvider {
   }
 
   private async getEvents(blockNumber: number): Promise<EventsMap> {
-    const events: Event[] = [];
+    let events: Event[] = [];
 
     let continuationToken: string | undefined;
     do {
@@ -318,7 +318,7 @@ export class StarknetProvider extends BaseProvider {
         continuation_token: continuationToken
       });
 
-      events.push(...result.events);
+      events = events.concat(result.events);
 
       continuationToken = result.continuation_token;
     } while (continuationToken);
@@ -345,7 +345,7 @@ export class StarknetProvider extends BaseProvider {
     toBlock: number,
     address: string
   ): Promise<CheckpointRecord[]> {
-    const events: Event[] = [];
+    let events: Event[] = [];
 
     let continuationToken: string | undefined;
     do {
@@ -357,7 +357,7 @@ export class StarknetProvider extends BaseProvider {
         continuation_token: continuationToken
       });
 
-      events.push(...result.events);
+      events = events.concat(result.events);
 
       continuationToken = result.continuation_token;
     } while (continuationToken);
@@ -369,7 +369,7 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const events: CheckpointRecord[] = [];
+    let events: CheckpointRecord[] = [];
 
     for (const source of this.instance.getCurrentSources(fromBlock)) {
       const addressEvents = await this.getCheckpointsRangeForAddress(
@@ -377,7 +377,7 @@ export class StarknetProvider extends BaseProvider {
         toBlock,
         source.contract
       );
-      events.push(...addressEvents);
+      events = events.concat(addressEvents);
     }
 
     return events;
