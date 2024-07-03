@@ -343,7 +343,8 @@ export class StarknetProvider extends BaseProvider {
   async getCheckpointsRangeForAddress(
     fromBlock: number,
     toBlock: number,
-    address: string
+    address: string,
+    eventNames: string[]
   ): Promise<CheckpointRecord[]> {
     let events: Event[] = [];
 
@@ -353,6 +354,7 @@ export class StarknetProvider extends BaseProvider {
         from_block: { block_number: fromBlock },
         to_block: { block_number: toBlock },
         address: address,
+        keys: [eventNames.map(name => `0x${hash.starknetKeccak(name).toString(16)}`)],
         chunk_size: 1000,
         continuation_token: continuationToken
       });
@@ -375,7 +377,8 @@ export class StarknetProvider extends BaseProvider {
       const addressEvents = await this.getCheckpointsRangeForAddress(
         fromBlock,
         toBlock,
-        source.contract
+        source.contract,
+        source.events.map(event => event.name)
       );
       events = events.concat(addressEvents);
     }
