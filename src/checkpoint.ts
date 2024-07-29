@@ -347,14 +347,14 @@ export default class Checkpoint {
   }
 
   private async next(blockNum: number) {
-    let checkpointBlock;
+    let checkpointBlock, preloadedBlock;
     if (!this.config.tx_fn && !this.config.global_events) {
       checkpointBlock = await this.getNextCheckpointBlock(blockNum);
 
       if (checkpointBlock) {
         blockNum = checkpointBlock;
       } else if (blockNum <= this.preloadEndBlock) {
-        const preloadedBlock = await this.preload(blockNum);
+        preloadedBlock = await this.preload(blockNum);
         blockNum = preloadedBlock || this.preloadEndBlock + 1;
       }
     }
@@ -388,6 +388,10 @@ export default class Checkpoint {
 
       if (checkpointBlock && this.cpBlocksCache) {
         this.cpBlocksCache.unshift(checkpointBlock);
+      }
+
+      if (preloadedBlock && this.preloadedBlocks) {
+        this.preloadedBlocks.unshift(preloadedBlock);
       }
 
       await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
