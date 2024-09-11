@@ -327,9 +327,17 @@ export default class Checkpoint {
 
     while (currentBlock <= this.preloadEndBlock) {
       const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
-      const checkpoints = await this.indexer
-        .getProvider()
-        .getCheckpointsRange(currentBlock, endBlock);
+      let checkpoints: CheckpointRecord[];
+      try {
+        checkpoints = await this.indexer.getProvider().getCheckpointsRange(currentBlock, endBlock);
+      } catch (e) {
+        this.log.error(
+          { blockNumber: currentBlock, err: e },
+          'error occurred during checkpoint fetching'
+        );
+        await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
+        continue;
+      }
 
       const increase =
         checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
