@@ -205,6 +205,10 @@ export class GqlEntityController {
   public async createEntityStores(knex: Knex): Promise<{ builder: Knex.SchemaBuilder }> {
     let builder = knex.schema;
 
+    if (knex.client.config.client === 'pg') {
+      builder = builder.raw('CREATE EXTENSION IF NOT EXISTS btree_gist');
+    }
+
     if (this.schemaObjects.length === 0) {
       return { builder };
     }
@@ -241,6 +245,16 @@ export class GqlEntityController {
           }
         });
       });
+
+      if (knex.client.config.client === 'pg') {
+        builder = builder.raw(
+          knex
+            .raw('ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, block_range WITH &&)', [
+              tableName
+            ])
+            .toQuery()
+        );
+      }
     });
 
     await builder;
