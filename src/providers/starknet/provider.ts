@@ -56,6 +56,11 @@ export class StarknetProvider extends BaseProvider {
     return this.provider.getBlockNumber();
   }
 
+  async getBlockHash(blockNumber: number) {
+    const block = await this.provider.getBlock(blockNumber);
+    return block.block_hash;
+  }
+
   async processBlock(blockNum: number, parentHash: string | null) {
     let block: Block;
     let blockEvents: EventsMap;

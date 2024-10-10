@@ -48,6 +48,11 @@ export class EvmProvider extends BaseProvider {
     return this.provider.getBlockNumber();
   }
 
+  async getBlockHash(blockNumber: number) {
+    const block = await this.provider.getBlock(blockNumber);
+    return block.hash;
+  }
+
   async processBlock(blockNum: number, parentHash: string | null) {
     let block: BlockWithTransactions | null;
     let eventsMap: EventsMap;

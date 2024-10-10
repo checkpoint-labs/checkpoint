@@ -5,7 +5,7 @@ import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BaseIndexer, BlockNotFoundError } from './providers';
+import { BaseIndexer, BlockNotFoundError, ReorgDetectedError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
@@ -15,6 +15,7 @@ import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
 import { sleep } from './utils/helpers';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
+import { getTableName } from './utils/database';
 
 const SCHEMA_VERSION = 1;
 
@@ -398,6 +399,8 @@ export default class Checkpoint {
             this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
           }
         }
+      } else if (err instanceof ReorgDetectedError) {
+        await this.handleReorg(blockNum);
       } else {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
       }
@@ -413,6 +416,48 @@ export default class Checkpoint {
       await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
       return this.next(blockNum);
     }
+  }
+
+  private async handleReorg(blockNumber: number) {
+    this.log.info({ blockNumber }, 'handling reorg');
+
+    let current = blockNumber - 1;
+    let lastGoodBlock: null | number = null;
+    while (lastGoodBlock === null) {
+      const storedBlockHash = await this.store.getBlockHash(current);
+      const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
+
+      if (storedBlockHash === currentBlockHash) {
+        lastGoodBlock = current;
+      } else {
+        current -= 1;
+      }
+    }
+
+    const entities = await this.entityController.schemaObjects;
+    const tables = entities.map(entity => getTableName(entity.name.toLowerCase()));
+
+    await this.knex.transaction(async trx => {
+      for (const tableName of tables) {
+        await trx.table(tableName).whereRaw('lower(block_range) > ?', [lastGoodBlock]).delete();
+
+        await trx
+          .table(tableName)
+          .whereRaw('block_range @> ?', [lastGoodBlock])
+          .update({
+            block_range: this.knex.raw('int8range(lower(block_range), NULL)')
+          });
+      }
+    });
+
+    // TODO: when we have full transaction support, we should include this in the transaction
+    await this.setLastIndexedBlock(lastGoodBlock + 1);
+    await this.store.removeFutureBlocks(lastGoodBlock);
+
+    this.cpBlocksCache = null;
+    this.blockHashCache = null;
+
+    this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {

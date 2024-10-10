@@ -67,6 +67,12 @@ export class BaseProvider {
     throw new Error('getLatestBlockNumber method was not defined');
   }
 
+  getBlockHash(blockNumber: number): Promise<string> {
+    throw new Error(
+      `getBlockHash method was not defined when getting block hash for block ${blockNumber}`
+    );
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   processBlock(blockNum: number, parentHash: string | null): Promise<number> {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
