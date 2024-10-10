@@ -1,4 +1,4 @@
-import { BaseProvider, BlockNotFoundError } from '../base';
+import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { getAddress } from '@ethersproject/address';
 import { Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, LogDescription } from '@ethersproject/abi';
@@ -48,7 +48,7 @@ export class EvmProvider extends BaseProvider {
     return this.provider.getBlockNumber();
   }
 
-  async processBlock(blockNum: number) {
+  async processBlock(blockNum: number, parentHash: string | null) {
     let block: BlockWithTransactions | null;
     let eventsMap: EventsMap;
     try {
@@ -60,6 +60,11 @@ export class EvmProvider extends BaseProvider {
       if (block === null) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
+      }
+
+      if (parentHash && block.parentHash !== parentHash) {
+        this.log.error({ blockNumber: blockNum }, 'reorg detected');
+        throw new ReorgDetectedError();
       }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');

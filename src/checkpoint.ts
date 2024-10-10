@@ -43,6 +43,7 @@ export default class Checkpoint {
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
   private cpBlocksCache: number[] | null;
+  private blockHashCache: { blockNumber: number; hash: string } | null = null;
 
   constructor(
     config: CheckpointConfig,
@@ -288,6 +289,8 @@ export default class Checkpoint {
   }
 
   public async setBlockHash(blockNum: number, hash: string) {
+    this.blockHashCache = { blockNumber: blockNum, hash };
+
     return this.store.setBlockHash(blockNum, hash);
   }
 
@@ -377,7 +380,8 @@ export default class Checkpoint {
       register.setCurrentBlock(BigInt(blockNum));
 
       const initialSources = this.getCurrentSources(blockNum);
-      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum);
+      const parentHash = await this.getBlockHash(blockNum - 1);
+      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum, parentHash);
       const sources = this.getCurrentSources(nextBlockNumber);
 
       if (initialSources.length !== sources.length) {
@@ -426,6 +430,14 @@ export default class Checkpoint {
 
     this.cpBlocksCache = checkpointBlocks;
     return this.cpBlocksCache.shift() || null;
+  }
+
+  private async getBlockHash(blockNumber: number): Promise<string | null> {
+    if (this.blockHashCache && this.blockHashCache.blockNumber === blockNumber) {
+      return this.blockHashCache.hash;
+    }
+
+    return this.store.getBlockHash(blockNumber);
   }
 
   private get store(): CheckpointsStore {

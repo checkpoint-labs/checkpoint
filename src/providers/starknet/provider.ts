@@ -1,5 +1,5 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
-import { BaseProvider, BlockNotFoundError } from '../base';
+import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import {
@@ -56,7 +56,7 @@ export class StarknetProvider extends BaseProvider {
     return this.provider.getBlockNumber();
   }
 
-  async processBlock(blockNum: number) {
+  async processBlock(blockNum: number, parentHash: string | null) {
     let block: Block;
     let blockEvents: EventsMap;
     try {
@@ -64,6 +64,11 @@ export class StarknetProvider extends BaseProvider {
         this.provider.getBlockWithTxs(blockNum),
         this.getEvents(blockNum)
       ]);
+
+      if (parentHash && block.parent_hash !== parentHash) {
+        this.log.error({ blockNumber: blockNum }, 'reorg detected');
+        throw new ReorgDetectedError();
+      }
 
       if (!isFullBlock(block) || block.block_number !== blockNum) {
         this.log.error({ blockNumber: blockNum }, 'invalid block');

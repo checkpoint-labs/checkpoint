@@ -21,6 +21,13 @@ export class BlockNotFoundError extends Error {
   }
 }
 
+export class ReorgDetectedError extends Error {
+  constructor() {
+    super('Reorg detected');
+    this.name = 'ReorgDetectedError';
+  }
+}
+
 export class BaseProvider {
   protected readonly instance: Instance;
   protected readonly log: Logger;
@@ -60,7 +67,8 @@ export class BaseProvider {
     throw new Error('getLatestBlockNumber method was not defined');
   }
 
-  processBlock(blockNum: number): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  processBlock(blockNum: number, parentHash: string | null): Promise<number> {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
   }
 
