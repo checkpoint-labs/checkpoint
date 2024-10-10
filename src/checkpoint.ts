@@ -287,6 +287,10 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
+  public async setBlockHash(blockNum: number, hash: string) {
+    return this.store.setBlockHash(blockNum, hash);
+  }
+
   public async setLastIndexedBlock(block: number) {
     await this.store.setMetadata(MetadataId.LastIndexedBlock, block);
   }

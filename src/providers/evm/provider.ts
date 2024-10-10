@@ -68,6 +68,8 @@ export class EvmProvider extends BaseProvider {
 
     await this.handleBlock(block, eventsMap);
 
+    await this.instance.setBlockHash(blockNum, block.hash);
+
     await this.instance.setLastIndexedBlock(block.number);
 
     return blockNum + 1;

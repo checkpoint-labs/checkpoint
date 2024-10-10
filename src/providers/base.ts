@@ -6,6 +6,7 @@ import { CheckpointConfig, ContractSourceConfig } from '../types';
 export type Instance = {
   config: CheckpointConfig;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
+  setBlockHash(blockNum: number, hash: string);
   setLastIndexedBlock(blockNum: number);
   insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterParams(): Promise<{
