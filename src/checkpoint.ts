@@ -443,7 +443,7 @@ export default class Checkpoint {
 
         await trx
           .table(tableName)
-          .whereRaw('block_range @> ?', [lastGoodBlock])
+          .whereRaw('block_range @> int8(??)', [lastGoodBlock])
           .update({
             block_range: this.knex.raw('int8range(lower(block_range), NULL)')
           });
