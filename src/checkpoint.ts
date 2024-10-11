@@ -427,7 +427,7 @@ export default class Checkpoint {
       const storedBlockHash = await this.store.getBlockHash(current);
       const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
 
-      if (storedBlockHash === currentBlockHash) {
+      if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
         lastGoodBlock = current;
       } else {
         current -= 1;
