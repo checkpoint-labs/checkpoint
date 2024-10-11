@@ -262,7 +262,7 @@ export class CheckpointsStore {
 
   public async removeFutureBlocks(blockNumber: number): Promise<void> {
     await this.knex
-      .table(Table.Checkpoints)
+      .table(Table.Blocks)
       .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
       .del();
   }
