@@ -400,7 +400,8 @@ export default class Checkpoint {
           }
         }
       } else if (err instanceof ReorgDetectedError) {
-        await this.handleReorg(blockNum);
+        const nextBlockNumber = await this.handleReorg(blockNum);
+        return this.next(nextBlockNumber);
       } else {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
       }
@@ -451,13 +452,15 @@ export default class Checkpoint {
     });
 
     // TODO: when we have full transaction support, we should include this in the transaction
-    await this.setLastIndexedBlock(lastGoodBlock + 1);
+    await this.setLastIndexedBlock(lastGoodBlock);
     await this.store.removeFutureBlocks(lastGoodBlock);
 
     this.cpBlocksCache = null;
     this.blockHashCache = null;
 
     this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
+
+    return lastGoodBlock + 1;
   }
 
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
