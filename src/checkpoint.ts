@@ -452,8 +452,7 @@ export default class Checkpoint {
     });
 
     // TODO: when we have full transaction support, we should include this in the transaction
-    await this.setLastIndexedBlock(lastGoodBlock);
-    await this.store.removeFutureBlocks(lastGoodBlock);
+    await this.store.removeFutureData(lastGoodBlock);
 
     this.cpBlocksCache = null;
     this.blockHashCache = null;

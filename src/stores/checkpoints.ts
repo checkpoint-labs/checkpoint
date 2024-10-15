@@ -260,11 +260,24 @@ export class CheckpointsStore {
     await Promise.all(chunk(checkpoints, 1000).map(chunk => insert(chunk)));
   }
 
-  public async removeFutureBlocks(blockNumber: number): Promise<void> {
-    await this.knex
-      .table(Table.Blocks)
-      .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
-      .del();
+  public async removeFutureData(blockNumber: number): Promise<void> {
+    return this.knex.transaction(async trx => {
+      await trx
+        .table(Table.Metadata)
+        .insert({
+          [Fields.Metadata.Id]: MetadataId.LastIndexedBlock,
+          [Fields.Metadata.Value]: blockNumber
+        })
+        .onConflict(Fields.Metadata.Id)
+        .merge();
+
+      await trx
+        .table(Table.Checkpoints)
+        .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
+        .del();
+
+      await trx.table(Table.Blocks).where(Fields.Blocks.Number, '>', blockNumber).del();
+    });
   }
 
   /**
