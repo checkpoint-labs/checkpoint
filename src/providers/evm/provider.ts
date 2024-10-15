@@ -85,15 +85,6 @@ export class EvmProvider extends BaseProvider {
     return blockNum + 1;
   }
 
-  async processPool(blockNumber: number) {
-    const [block, eventsMap] = await Promise.all([
-      this.provider.getBlockWithTransactions('latest'),
-      this.getEvents('latest')
-    ]);
-
-    await this.handlePool(block, eventsMap, blockNumber);
-  }
-
   private async handleBlock(block: BlockWithTransactions, eventsMap: EventsMap) {
     this.log.info({ blockNumber: block.number }, 'handling block');
 
@@ -108,26 +99,6 @@ export class EvmProvider extends BaseProvider {
     this.processedPoolTransactions.clear();
 
     this.log.debug({ blockNumber: block.number }, 'handling block done');
-  }
-
-  private async handlePool(
-    block: BlockWithTransactions,
-    eventsMap: EventsMap,
-    blockNumber: number
-  ) {
-    this.log.info('handling pool');
-
-    const txsToCheck = block.transactions.filter(
-      tx => !this.processedPoolTransactions.has(tx.hash)
-    );
-
-    for (const [i, tx] of txsToCheck.entries()) {
-      await this.handleTx(null, blockNumber, i, tx, tx.hash ? eventsMap[tx.hash] || [] : []);
-
-      this.processedPoolTransactions.add(tx.hash);
-    }
-
-    this.log.info('handling pool done');
   }
 
   private async handleTx(
