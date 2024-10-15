@@ -5,12 +5,17 @@ import { chunk } from '../utils/helpers';
 import { TemplateSource } from '../types';
 
 const Table = {
+  Blocks: '_blocks',
   Checkpoints: '_checkpoints',
-  Metadata: '_metadatas', // using plural names to confirm with standards entities
+  Metadata: '_metadatas', // using plural names to conform with standards entities,
   TemplateSources: '_template_sources'
 };
 
 const Fields = {
+  Blocks: {
+    Number: 'block_number',
+    Hash: 'hash'
+  },
   Checkpoints: {
     Id: 'id',
     BlockNumber: 'block_number',
@@ -84,11 +89,19 @@ export class CheckpointsStore {
   public async createStore(): Promise<{ builder: Knex.SchemaBuilder }> {
     this.log.debug('creating checkpoints tables...');
 
+    const hasBlocksTable = await this.knex.schema.hasTable(Table.Blocks);
     const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
     const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
 
     let builder = this.knex.schema;
+
+    if (!hasBlocksTable) {
+      builder = builder.createTable(Table.Blocks, t => {
+        t.bigint(Fields.Blocks.Number).primary();
+        t.string(Fields.Blocks.Hash).notNullable().unique();
+      });
+    }
 
     if (!hasCheckpointsTable) {
       builder = builder.createTable(Table.Checkpoints, t => {
@@ -131,9 +144,14 @@ export class CheckpointsStore {
   public async resetStore(): Promise<void> {
     this.log.debug('truncating checkpoints tables');
 
+    const hasBlocksTable = await this.knex.schema.hasTable(Table.Blocks);
     const hasCheckpointsTable = await this.knex.schema.hasTable(Table.Checkpoints);
     const hasMetadataTable = await this.knex.schema.hasTable(Table.Metadata);
     const hasTemplateSourcesTable = await this.knex.schema.hasTable(Table.TemplateSources);
+
+    if (hasBlocksTable) {
+      await this.knex.schema.dropTable(Table.Blocks);
+    }
 
     if (hasCheckpointsTable) {
       await this.knex.schema.dropTable(Table.Checkpoints);
@@ -150,6 +168,27 @@ export class CheckpointsStore {
     this.log.debug('checkpoints tables dropped');
 
     await this.createStore();
+  }
+
+  public async getBlockHash(blockNumber: number): Promise<string | null> {
+    const blocks = await this.knex
+      .select(Fields.Blocks.Hash)
+      .from(Table.Blocks)
+      .where(Fields.Blocks.Number, blockNumber)
+      .limit(1);
+
+    if (blocks.length == 0) {
+      return null;
+    }
+
+    return blocks[0][Fields.Blocks.Hash];
+  }
+
+  public async setBlockHash(blockNumber: number, hash: string): Promise<void> {
+    await this.knex.table(Table.Blocks).insert({
+      [Fields.Blocks.Number]: blockNumber,
+      [Fields.Blocks.Hash]: hash
+    });
   }
 
   public async getMetadata(id: string): Promise<string | null> {
@@ -219,6 +258,26 @@ export class CheckpointsStore {
     };
 
     await Promise.all(chunk(checkpoints, 1000).map(chunk => insert(chunk)));
+  }
+
+  public async removeFutureData(blockNumber: number): Promise<void> {
+    return this.knex.transaction(async trx => {
+      await trx
+        .table(Table.Metadata)
+        .insert({
+          [Fields.Metadata.Id]: MetadataId.LastIndexedBlock,
+          [Fields.Metadata.Value]: blockNumber
+        })
+        .onConflict(Fields.Metadata.Id)
+        .merge();
+
+      await trx
+        .table(Table.Checkpoints)
+        .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
+        .del();
+
+      await trx.table(Table.Blocks).where(Fields.Blocks.Number, '>', blockNumber).del();
+    });
   }
 
   /**
