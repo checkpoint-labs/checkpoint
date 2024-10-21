@@ -6,6 +6,7 @@ import { CheckpointConfig, ContractSourceConfig } from '../types';
 export type Instance = {
   config: CheckpointConfig;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
+  setBlockHash(blockNum: number, hash: string);
   setLastIndexedBlock(blockNum: number);
   insertCheckpoints(checkpoints: CheckpointRecord[]);
   getWriterParams(): Promise<{
@@ -17,6 +18,13 @@ export class BlockNotFoundError extends Error {
   constructor() {
     super('Block not found');
     this.name = 'BlockNotFoundError';
+  }
+}
+
+export class ReorgDetectedError extends Error {
+  constructor() {
+    super('Reorg detected');
+    this.name = 'ReorgDetectedError';
   }
 }
 
@@ -59,7 +67,14 @@ export class BaseProvider {
     throw new Error('getLatestBlockNumber method was not defined');
   }
 
-  processBlock(blockNum: number): Promise<number> {
+  getBlockHash(blockNumber: number): Promise<string> {
+    throw new Error(
+      `getBlockHash method was not defined when getting block hash for block ${blockNumber}`
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  processBlock(blockNum: number, parentHash: string | null): Promise<number> {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
   }
 

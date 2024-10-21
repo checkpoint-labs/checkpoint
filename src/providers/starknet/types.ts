@@ -8,7 +8,7 @@ export type PendingTransaction = RPC.PendingTransactions[number];
 export type Event = RPC.GetEventsResponse['events'][number];
 
 // (Partially) narrowed types as real types are not exported from `starknet`.
-export type FullBlock = Block & { block_number: number };
+export type FullBlock = Block & { block_number: number; block_hash: string };
 export type DeployTransaction = Transaction & { contract_address: string };
 
 export type EventsMap = { [key: string]: Event[] };

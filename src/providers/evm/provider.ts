@@ -1,4 +1,4 @@
-import { BaseProvider, BlockNotFoundError } from '../base';
+import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { getAddress } from '@ethersproject/address';
 import { Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, LogDescription } from '@ethersproject/abi';
@@ -48,7 +48,12 @@ export class EvmProvider extends BaseProvider {
     return this.provider.getBlockNumber();
   }
 
-  async processBlock(blockNum: number) {
+  async getBlockHash(blockNumber: number) {
+    const block = await this.provider.getBlock(blockNumber);
+    return block.hash;
+  }
+
+  async processBlock(blockNum: number, parentHash: string | null) {
     let block: BlockWithTransactions | null;
     let eventsMap: EventsMap;
     try {
@@ -61,6 +66,11 @@ export class EvmProvider extends BaseProvider {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
       }
+
+      if (parentHash && block.parentHash !== parentHash) {
+        this.log.error({ blockNumber: blockNum }, 'reorg detected');
+        throw new ReorgDetectedError();
+      }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
@@ -68,18 +78,11 @@ export class EvmProvider extends BaseProvider {
 
     await this.handleBlock(block, eventsMap);
 
+    await this.instance.setBlockHash(blockNum, block.hash);
+
     await this.instance.setLastIndexedBlock(block.number);
 
     return blockNum + 1;
-  }
-
-  async processPool(blockNumber: number) {
-    const [block, eventsMap] = await Promise.all([
-      this.provider.getBlockWithTransactions('latest'),
-      this.getEvents('latest')
-    ]);
-
-    await this.handlePool(block, eventsMap, blockNumber);
   }
 
   private async handleBlock(block: BlockWithTransactions, eventsMap: EventsMap) {
@@ -96,26 +99,6 @@ export class EvmProvider extends BaseProvider {
     this.processedPoolTransactions.clear();
 
     this.log.debug({ blockNumber: block.number }, 'handling block done');
-  }
-
-  private async handlePool(
-    block: BlockWithTransactions,
-    eventsMap: EventsMap,
-    blockNumber: number
-  ) {
-    this.log.info('handling pool');
-
-    const txsToCheck = block.transactions.filter(
-      tx => !this.processedPoolTransactions.has(tx.hash)
-    );
-
-    for (const [i, tx] of txsToCheck.entries()) {
-      await this.handleTx(null, blockNumber, i, tx, tx.hash ? eventsMap[tx.hash] || [] : []);
-
-      this.processedPoolTransactions.add(tx.hash);
-    }
-
-    this.log.info('handling pool done');
   }
 
   private async handleTx(

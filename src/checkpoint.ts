@@ -5,7 +5,7 @@ import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BaseIndexer, BlockNotFoundError } from './providers';
+import { BaseIndexer, BlockNotFoundError, ReorgDetectedError } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
@@ -15,6 +15,7 @@ import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
 import { sleep } from './utils/helpers';
 import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
+import { getTableName } from './utils/database';
 
 const SCHEMA_VERSION = 1;
 
@@ -43,6 +44,7 @@ export default class Checkpoint {
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
   private cpBlocksCache: number[] | null;
+  private blockHashCache: { blockNumber: number; hash: string } | null = null;
 
   constructor(
     config: CheckpointConfig,
@@ -287,6 +289,12 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
+  public async setBlockHash(blockNum: number, hash: string) {
+    this.blockHashCache = { blockNumber: blockNum, hash };
+
+    return this.store.setBlockHash(blockNum, hash);
+  }
+
   public async setLastIndexedBlock(block: number) {
     await this.store.setMetadata(MetadataId.LastIndexedBlock, block);
   }
@@ -373,7 +381,8 @@ export default class Checkpoint {
       register.setCurrentBlock(BigInt(blockNum));
 
       const initialSources = this.getCurrentSources(blockNum);
-      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum);
+      const parentHash = await this.getBlockHash(blockNum - 1);
+      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum, parentHash);
       const sources = this.getCurrentSources(nextBlockNumber);
 
       if (initialSources.length !== sources.length) {
@@ -390,6 +399,9 @@ export default class Checkpoint {
             this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
           }
         }
+      } else if (err instanceof ReorgDetectedError) {
+        const nextBlockNumber = await this.handleReorg(blockNum);
+        return this.next(nextBlockNumber);
       } else {
         this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
       }
@@ -407,6 +419,49 @@ export default class Checkpoint {
     }
   }
 
+  private async handleReorg(blockNumber: number) {
+    this.log.info({ blockNumber }, 'handling reorg');
+
+    let current = blockNumber - 1;
+    let lastGoodBlock: null | number = null;
+    while (lastGoodBlock === null) {
+      const storedBlockHash = await this.store.getBlockHash(current);
+      const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
+
+      if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
+        lastGoodBlock = current;
+      } else {
+        current -= 1;
+      }
+    }
+
+    const entities = await this.entityController.schemaObjects;
+    const tables = entities.map(entity => getTableName(entity.name.toLowerCase()));
+
+    await this.knex.transaction(async trx => {
+      for (const tableName of tables) {
+        await trx.table(tableName).whereRaw('lower(block_range) > ?', [lastGoodBlock]).delete();
+
+        await trx
+          .table(tableName)
+          .whereRaw('block_range @> int8(??)', [lastGoodBlock])
+          .update({
+            block_range: this.knex.raw('int8range(lower(block_range), NULL)')
+          });
+      }
+    });
+
+    // TODO: when we have full transaction support, we should include this in the transaction
+    await this.store.removeFutureData(lastGoodBlock);
+
+    this.cpBlocksCache = null;
+    this.blockHashCache = null;
+
+    this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
+
+    return lastGoodBlock + 1;
+  }
+
   private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
     if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
       return this.cpBlocksCache.shift() || null;
@@ -422,6 +477,14 @@ export default class Checkpoint {
 
     this.cpBlocksCache = checkpointBlocks;
     return this.cpBlocksCache.shift() || null;
+  }
+
+  private async getBlockHash(blockNumber: number): Promise<string | null> {
+    if (this.blockHashCache && this.blockHashCache.blockNumber === blockNumber) {
+      return this.blockHashCache.hash;
+    }
+
+    return this.store.getBlockHash(blockNumber);
   }
 
   private get store(): CheckpointsStore {
