@@ -151,7 +151,7 @@ export class EvmProvider extends BaseProvider {
     }
 
     let lastSources = this.instance.getCurrentSources(blockNumber);
-    const sourcesQueue = [...lastSources];
+    let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
@@ -201,7 +201,7 @@ export class EvmProvider extends BaseProvider {
         nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
       );
 
-      sourcesQueue.push(...newSources);
+      sourcesQueue = sourcesQueue.concat(newSources);
       lastSources = nextSources;
     }
 
@@ -217,7 +217,7 @@ export class EvmProvider extends BaseProvider {
     return events.reduce((acc, event) => {
       if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
 
-      acc[event.transactionHash].push(event);
+      acc[event.transactionHash] = acc[event.transactionHash].concat(event);
 
       return acc;
     }, {});
@@ -262,11 +262,11 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const events: CheckpointRecord[] = [];
+    let events: CheckpointRecord[] = [];
 
     for (const source of this.instance.getCurrentSources(fromBlock)) {
       const addressEvents = await this.getLogs(fromBlock, toBlock, source.contract);
-      events.push(...addressEvents);
+      events = events.concat(addressEvents);
     }
 
     return events;
