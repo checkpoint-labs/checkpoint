@@ -77,7 +77,36 @@ export async function queryMulti(
     Object.entries(where).map((w: [string, any]) => {
       // TODO: we could generate where as objects { name, column, operator, value }
       // so we don't have to cut it there
-      if (w[0].endsWith('_not')) {
+
+      const fieldName = w[0].split('_')[0];
+      const nestedReturnType = getNonNullType(
+        returnType.getFields()[fieldName].type as GraphQLObjectType
+      );
+
+      const isList = isListType(nestedReturnType);
+
+      if (isList) {
+        if (w[0].endsWith('_contains')) {
+          const arrayBindings = w[1].map(() => '?').join(', ');
+          const negated = w[0].endsWith('_not_contains');
+          const operator = negated ? '\\?|' : '\\?&';
+
+          query = query.whereRaw(`${negated ? 'NOT' : ''} ?? ${operator} array[${arrayBindings}]`, [
+            `${prefix}.${fieldName}`,
+            ...w[1]
+          ]);
+        } else if (w[0].endsWith('_not')) {
+          query = query.whereRaw(`NOT :field: @> :value::jsonb OR NOT :field: <@ :value::jsonb`, {
+            field: `${prefix}.${fieldName}`,
+            value: JSON.stringify(w[1])
+          });
+        } else {
+          query = query.whereRaw(`:field: @> :value::jsonb AND :field: <@ :value::jsonb`, {
+            field: `${prefix}.${fieldName}`,
+            value: JSON.stringify(w[1])
+          });
+        }
+      } else if (w[0].endsWith('_not')) {
         query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '!=', w[1]);
       } else if (w[0].endsWith('_gt')) {
         query = query.where(`${prefix}.${w[0].slice(0, -3)}`, '>', w[1]);
@@ -100,10 +129,6 @@ export async function queryMulti(
       } else if (w[0].endsWith('_in')) {
         query = query.whereIn(`${prefix}.${w[0].slice(0, -3)}`, w[1]);
       } else if (typeof w[1] === 'object' && w[0].endsWith('_')) {
-        const fieldName = w[0].slice(0, -1);
-        const nestedReturnType = getNonNullType(
-          returnType.getFields()[fieldName].type as GraphQLObjectType
-        );
         const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
 
         const fields = Object.values(nestedReturnType.getFields())

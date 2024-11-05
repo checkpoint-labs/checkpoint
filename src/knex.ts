@@ -4,7 +4,7 @@ import { ConnectionString } from 'connection-string';
 
 export type KnexType =
   | {
-      name: 'integer' | 'bigint' | 'boolean' | 'text' | 'json';
+      name: 'integer' | 'bigint' | 'boolean' | 'text' | 'json' | 'jsonb';
     }
   | {
       name: 'decimal';

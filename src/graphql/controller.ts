@@ -367,6 +367,24 @@ export class GqlEntityController {
           }
         }
 
+        if (isListType(nonNullFieldType)) {
+          const itemType = nonNullFieldType.ofType;
+
+          if (!isLeafType(itemType)) {
+            return;
+          }
+
+          whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
+          whereInputConfig.fields[`${field.name}_not`] = { type: nonNullFieldType };
+
+          if (itemType === GraphQLString) {
+            // those are the only supported operators for string arrays because PostgreSQL intersection
+            // for jsonb is only supported for string arrays
+            whereInputConfig.fields[`${field.name}_contains`] = { type: nonNullFieldType };
+            whereInputConfig.fields[`${field.name}_not_contains`] = { type: nonNullFieldType };
+          }
+        }
+
         // avoid setting up where filters for non scalar types
         if (!isLeafType(nonNullFieldType)) {
           return;
@@ -530,7 +548,7 @@ export class GqlEntityController {
     }
 
     if (type instanceof GraphQLList) {
-      return { name: 'json' };
+      return { name: 'jsonb' };
     }
 
     throw new Error(`sql type for ${type} is not supported`);
