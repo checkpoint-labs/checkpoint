@@ -202,6 +202,7 @@ export default class Checkpoint {
     await this.store.createStore();
     await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
     await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
+    await this.store.removeBlocks();
 
     await this.entityController.createEntityStores(this.knex);
   }
