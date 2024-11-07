@@ -73,17 +73,20 @@ export async function queryMulti(
   let query = knex.select(`${tableName}.*`).from(tableName);
   query = applyBlockFilter(query, tableName, args.block);
 
-  const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
+  const handleWhere = (
+    query: Knex.QueryBuilder,
+    prefix: string,
+    returnType: GraphQLObjectType,
+    where: Record<string, any>
+  ) => {
     Object.entries(where).map((w: [string, any]) => {
       // TODO: we could generate where as objects { name, column, operator, value }
       // so we don't have to cut it there
 
       const fieldName = w[0].split('_')[0];
-      const nestedReturnType = getNonNullType(
-        returnType.getFields()[fieldName].type as GraphQLObjectType
-      );
+      const fieldType = getNonNullType(returnType.getFields()[fieldName].type);
 
-      const isList = isListType(nestedReturnType);
+      const isList = isListType(fieldType);
 
       if (isList) {
         if (w[0].endsWith('_contains')) {
@@ -128,10 +131,10 @@ export async function queryMulti(
         query = query.not.whereIn(`${prefix}.${w[0].slice(0, -7)}`, w[1]);
       } else if (w[0].endsWith('_in')) {
         query = query.whereIn(`${prefix}.${w[0].slice(0, -3)}`, w[1]);
-      } else if (typeof w[1] === 'object' && w[0].endsWith('_')) {
-        const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
+      } else if (typeof w[1] === 'object' && w[0].endsWith('_') && isObjectType(fieldType)) {
+        const nestedTableName = getTableName(fieldType.name.toLowerCase());
 
-        const fields = Object.values(nestedReturnType.getFields())
+        const fields = Object.values(fieldType.getFields())
           .filter(field => {
             const baseType = getNonNullType(field.type);
 
@@ -156,7 +159,7 @@ export async function queryMulti(
 
         query = applyBlockFilter(query, nestedTableName, args.block);
 
-        handleWhere(query, nestedTableName, w[1]);
+        handleWhere(query, nestedTableName, fieldType, w[1]);
       } else {
         query = query.where(`${prefix}.${w[0]}`, w[1]);
       }
@@ -164,7 +167,7 @@ export async function queryMulti(
   };
 
   if (args.where) {
-    handleWhere(query, tableName, args.where);
+    handleWhere(query, tableName, returnType, args.where);
   }
 
   if (args.orderBy) {
