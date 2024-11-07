@@ -170,6 +170,10 @@ export class CheckpointsStore {
     await this.createStore();
   }
 
+  public async removeBlocks(): Promise<void> {
+    return this.knex(Table.Blocks).del();
+  }
+
   public async getBlockHash(blockNumber: number): Promise<string | null> {
     const blocks = await this.knex
       .select(Fields.Blocks.Hash)
