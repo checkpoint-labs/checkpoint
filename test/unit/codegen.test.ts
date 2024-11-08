@@ -100,9 +100,9 @@ describe('getInitialValue', () => {
     expect(getInitialValue(proposalFields['active'].type)).toBe(false);
   });
 
-  it('should return empty array for List types', () => {
-    expect(getInitialValue(spaceFields['strategies'].type)).toEqual([]);
-    expect(getInitialValue(spaceFields['strategies_nonnull'].type)).toEqual([]);
+  it('should return stringified empty array for List types', () => {
+    expect(getInitialValue(spaceFields['strategies'].type)).toEqual('[]');
+    expect(getInitialValue(spaceFields['strategies_nonnull'].type)).toEqual('[]');
   });
 
   it('should return empty string for object types', () => {

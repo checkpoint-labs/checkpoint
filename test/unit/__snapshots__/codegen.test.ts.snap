@@ -16,8 +16,8 @@ export class Space extends Model {
     this.initialSet('voting_delay', 0);
     this.initialSet('proposal_threshold', 0);
     this.initialSet('quorum', 0);
-    this.initialSet('strategies', []);
-    this.initialSet('strategies_nonnull', []);
+    this.initialSet('strategies', "[]");
+    this.initialSet('strategies_nonnull', "[]");
   }
 
   static async loadEntity(id) {
@@ -217,8 +217,8 @@ export class Space extends Model {
     this.initialSet('voting_delay', 0);
     this.initialSet('proposal_threshold', 0);
     this.initialSet('quorum', 0);
-    this.initialSet('strategies', []);
-    this.initialSet('strategies_nonnull', []);
+    this.initialSet('strategies', "[]");
+    this.initialSet('strategies_nonnull', "[]");
   }
 
   static async loadEntity(id: string): Promise<Space | null> {
