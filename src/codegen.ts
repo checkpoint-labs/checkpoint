@@ -74,7 +74,7 @@ export const getTypeInfo = (
     const nonNullNestedType =
       type.ofType instanceof GraphQLNonNull ? type.ofType.ofType : type.ofType;
 
-    return { type: `${getTypeInfo(nonNullNestedType, decimalTypes).type}[]`, initialValue: [] };
+    return { type: `${getTypeInfo(nonNullNestedType, decimalTypes).type}[]`, initialValue: '[]' };
   }
 
   throw new Error('Unknown type');
