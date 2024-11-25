@@ -1,26 +1,160 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`CheckpointsStore createStore should execute correct query 1`] = `
-"create table \`_blocks\` (\`block_number\` bigint, \`hash\` varchar(255) not null, primary key (\`block_number\`));
-create unique index \`_blocks_hash_unique\` on \`_blocks\` (\`hash\`);
-create table \`_checkpoints\` (\`id\` varchar(10), \`block_number\` bigint not null, \`contract_address\` varchar(66) not null, primary key (\`id\`));
-create index \`_checkpoints_block_number_index\` on \`_checkpoints\` (\`block_number\`);
-create index \`_checkpoints_contract_address_index\` on \`_checkpoints\` (\`contract_address\`);
-create table \`_metadatas\` (\`id\` varchar(20), \`value\` varchar(128) not null, primary key (\`id\`));
-create table \`_template_sources\` (\`id\` integer not null primary key autoincrement, \`contract_address\` varchar(66), \`start_block\` bigint not null, \`template\` varchar(128) not null)"
-`;
-
-exports[`CheckpointsStore insertCheckpoints should insert checkpoints 1`] = `
+exports[`CheckpointsStore blocks should remove blocks 1`] = `
 [
   {
     "block_number": 5000,
-    "contract_address": "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
-    "id": "a739beda26",
+    "hash": "0x0",
+    "indexer": "default",
   },
   {
-    "block_number": 123222,
-    "contract_address": "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
-    "id": "d2b8dcc2b5",
+    "block_number": 5001,
+    "hash": "0x1",
+    "indexer": "default",
+  },
+]
+`;
+
+exports[`CheckpointsStore blocks should set block hash 1`] = `
+[
+  {
+    "block_number": 5000,
+    "hash": "0x0",
+    "indexer": "default",
+  },
+  {
+    "block_number": 5001,
+    "hash": "0x1",
+    "indexer": "default",
+  },
+  {
+    "block_number": 5000,
+    "hash": "0xa",
+    "indexer": "OTHER",
+  },
+]
+`;
+
+exports[`CheckpointsStore checkpoints should insert checkpoints 1`] = `
+[
+  {
+    "block_number": 5000,
+    "contract_address": "0x01",
+    "id": "6f1246bdea",
+    "indexer": "default",
+  },
+  {
+    "block_number": 9000,
+    "contract_address": "0x02",
+    "id": "92df4d22e3",
+    "indexer": "default",
+  },
+  {
+    "block_number": 11000,
+    "contract_address": "0x01",
+    "id": "24a44a0b0b",
+    "indexer": "default",
+  },
+]
+`;
+
+exports[`CheckpointsStore createStore should execute correct query 1`] = `
+"create table \`_blocks\` (\`indexer\` varchar(255) not null, \`block_number\` bigint, \`hash\` varchar(255) not null, primary key (\`indexer\`, \`block_number\`));
+create table \`_checkpoints\` (\`id\` varchar(10), \`indexer\` varchar(255) not null, \`block_number\` bigint not null, \`contract_address\` varchar(66) not null, primary key (\`id\`, \`indexer\`));
+create index \`_checkpoints_block_number_index\` on \`_checkpoints\` (\`block_number\`);
+create index \`_checkpoints_contract_address_index\` on \`_checkpoints\` (\`contract_address\`);
+create table \`_metadatas\` (\`id\` varchar(20), \`indexer\` varchar(255) not null, \`value\` varchar(128) not null, primary key (\`id\`, \`indexer\`));
+create table \`_template_sources\` (\`indexer\` varchar(255) not null, \`contract_address\` varchar(66), \`start_block\` bigint not null, \`template\` varchar(128) not null)"
+`;
+
+exports[`CheckpointsStore metadata should set metadata 1`] = `
+[
+  {
+    "id": "key",
+    "indexer": "default",
+    "value": "default_value",
+  },
+  {
+    "id": "number_key",
+    "indexer": "default",
+    "value": "1111",
+  },
+  {
+    "id": "key",
+    "indexer": "OTHER",
+    "value": "other_value",
+  },
+]
+`;
+
+exports[`CheckpointsStore removeFutureData should remove future data 1`] = `
+[
+  {
+    "block_number": 5000,
+    "contract_address": "0x01",
+    "id": "6f1246bdea",
+    "indexer": "default",
+  },
+  {
+    "block_number": 9000,
+    "contract_address": "0x02",
+    "id": "92df4d22e3",
+    "indexer": "default",
+  },
+  {
+    "block_number": 11000,
+    "contract_address": "0x01",
+    "id": "24a44a0b0b",
+    "indexer": "OTHER",
+  },
+]
+`;
+
+exports[`CheckpointsStore template sources should insert template sources 1`] = `
+[
+  {
+    "contract_address": "0x01",
+    "indexer": "default",
+    "start_block": 1000,
+    "template": "Template1",
+  },
+  {
+    "contract_address": "0x01",
+    "indexer": "default",
+    "start_block": 2000,
+    "template": "Template1",
+  },
+  {
+    "contract_address": "0x02",
+    "indexer": "default",
+    "start_block": 2100,
+    "template": "Template3",
+  },
+  {
+    "contract_address": "0x01",
+    "indexer": "OTHER",
+    "start_block": 50,
+    "template": "Template1",
+  },
+]
+`;
+
+exports[`CheckpointsStore template sources should retrieve template sources 1`] = `
+[
+  {
+    "contractAddress": "0x01",
+    "startBlock": 1000,
+    "template": "Template1",
+  },
+  {
+    "contractAddress": "0x01",
+    "startBlock": 2000,
+    "template": "Template1",
+  },
+  {
+    "contractAddress": "0x02",
+    "startBlock": 2100,
+    "template": "Template3",
   },
 ]
 `;
