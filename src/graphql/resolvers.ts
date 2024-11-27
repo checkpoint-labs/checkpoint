@@ -73,44 +73,28 @@ export async function queryMulti(
   let query = knex.select(`${tableName}.*`).from(tableName);
   query = applyBlockFilter(query, tableName, args.block);
 
-  const handleWhere = (
-    query: Knex.QueryBuilder,
-    prefix: string,
-    returnType: GraphQLObjectType,
-    where: Record<string, any>
-  ) => {
+  const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
+    const isFieldList = (fieldName: string) => {
+      const fieldType = getNonNullType(returnType.getFields()[fieldName].type);
+      return isListType(fieldType);
+    };
+
     Object.entries(where).map((w: [string, any]) => {
       // TODO: we could generate where as objects { name, column, operator, value }
       // so we don't have to cut it there
 
-      const fieldName = w[0].split('_')[0];
-      const fieldType = getNonNullType(returnType.getFields()[fieldName].type);
+      if (w[0].endsWith('_not')) {
+        const fieldName = w[0].slice(0, -4);
+        const isList = isFieldList(fieldName);
 
-      const isList = isListType(fieldType);
-
-      if (isList) {
-        if (w[0].endsWith('_contains')) {
-          const arrayBindings = w[1].map(() => '?').join(', ');
-          const negated = w[0].endsWith('_not_contains');
-          const operator = negated ? '\\?|' : '\\?&';
-
-          query = query.whereRaw(`${negated ? 'NOT' : ''} ?? ${operator} array[${arrayBindings}]`, [
-            `${prefix}.${fieldName}`,
-            ...w[1]
-          ]);
-        } else if (w[0].endsWith('_not')) {
+        if (isList) {
           query = query.whereRaw(`NOT :field: @> :value::jsonb OR NOT :field: <@ :value::jsonb`, {
             field: `${prefix}.${fieldName}`,
             value: JSON.stringify(w[1])
           });
         } else {
-          query = query.whereRaw(`:field: @> :value::jsonb AND :field: <@ :value::jsonb`, {
-            field: `${prefix}.${fieldName}`,
-            value: JSON.stringify(w[1])
-          });
+          query = query.where(`${prefix}.${fieldName}`, '!=', w[1]);
         }
-      } else if (w[0].endsWith('_not')) {
-        query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '!=', w[1]);
       } else if (w[0].endsWith('_gt')) {
         query = query.where(`${prefix}.${w[0].slice(0, -3)}`, '>', w[1]);
       } else if (w[0].endsWith('_gte')) {
@@ -120,21 +104,47 @@ export async function queryMulti(
       } else if (w[0].endsWith('_lte')) {
         query = query.where(`${prefix}.${w[0].slice(0, -4)}`, '<=', w[1]);
       } else if (w[0].endsWith('_not_contains')) {
-        query = query.not.whereLike(`${prefix}.${w[0].slice(0, -13)}`, `%${w[1]}%`);
+        const fieldName = w[0].slice(0, -13);
+        const isList = isFieldList(fieldName);
+
+        if (isList) {
+          const arrayBindings = w[1].map(() => '?').join(', ');
+          query = query.whereRaw(`NOT ?? \\?| array[${arrayBindings}]`, [
+            `${prefix}.${fieldName}`,
+            ...w[1]
+          ]);
+        } else {
+          query = query.not.whereLike(`${prefix}.${fieldName}`, `%${w[1]}%`);
+        }
       } else if (w[0].endsWith('_not_contains_nocase')) {
         query = query.not.whereILike(`${prefix}.${w[0].slice(0, -20)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_contains')) {
-        query = query.whereLike(`${prefix}.${w[0].slice(0, -9)}`, `%${w[1]}%`);
+        const fieldName = w[0].slice(0, -9);
+        const isList = isFieldList(fieldName);
+
+        if (isList) {
+          const arrayBindings = w[1].map(() => '?').join(', ');
+          query = query.whereRaw(`?? \\?& array[${arrayBindings}]`, [
+            `${prefix}.${fieldName}`,
+            ...w[1]
+          ]);
+        } else {
+          query = query.whereLike(`${prefix}.${fieldName}`, `%${w[1]}%`);
+        }
       } else if (w[0].endsWith('_contains_nocase')) {
         query = query.whereILike(`${prefix}.${w[0].slice(0, -16)}`, `%${w[1]}%`);
       } else if (w[0].endsWith('_not_in')) {
         query = query.not.whereIn(`${prefix}.${w[0].slice(0, -7)}`, w[1]);
       } else if (w[0].endsWith('_in')) {
         query = query.whereIn(`${prefix}.${w[0].slice(0, -3)}`, w[1]);
-      } else if (typeof w[1] === 'object' && w[0].endsWith('_') && isObjectType(fieldType)) {
-        const nestedTableName = getTableName(fieldType.name.toLowerCase());
+      } else if (typeof w[1] === 'object' && w[0].endsWith('_')) {
+        const fieldName = w[0].slice(0, -1);
+        const nestedReturnType = getNonNullType(
+          returnType.getFields()[fieldName].type as GraphQLObjectType
+        );
+        const nestedTableName = getTableName(nestedReturnType.name.toLowerCase());
 
-        const fields = Object.values(fieldType.getFields())
+        const fields = Object.values(nestedReturnType.getFields())
           .filter(field => {
             const baseType = getNonNullType(field.type);
 
@@ -159,15 +169,25 @@ export async function queryMulti(
 
         query = applyBlockFilter(query, nestedTableName, args.block);
 
-        handleWhere(query, nestedTableName, fieldType, w[1]);
+        handleWhere(query, nestedTableName, w[1]);
       } else {
-        query = query.where(`${prefix}.${w[0]}`, w[1]);
+        const fieldName = w[0];
+        const isList = isFieldList(fieldName);
+
+        if (isList) {
+          query = query.whereRaw(`:field: @> :value::jsonb AND :field: <@ :value::jsonb`, {
+            field: `${prefix}.${fieldName}`,
+            value: JSON.stringify(w[1])
+          });
+        } else {
+          query = query.where(`${prefix}.${fieldName}`, w[1]);
+        }
       }
     });
   };
 
   if (args.where) {
-    handleWhere(query, tableName, returnType, args.where);
+    handleWhere(query, tableName, args.where);
   }
 
   if (args.orderBy) {
