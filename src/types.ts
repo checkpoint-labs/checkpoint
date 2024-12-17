@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import Checkpoint from './checkpoint';
 import { LogLevel } from './utils/logger';
 import {
   contractSourceConfigSchema,
   contractTemplateSchema,
   checkpointConfigSchema
 } from './schemas';
+import { Instance } from './providers';
 
 export type TemplateSource = {
   contractAddress: string;
@@ -40,5 +40,5 @@ export type BaseWriterParams = {
   blockNumber: number;
   eventIndex?: number;
   source?: ContractSourceConfig;
-  instance: Checkpoint;
+  helpers: ReturnType<Instance['getWriterHelpers']>;
 };
