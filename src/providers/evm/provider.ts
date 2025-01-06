@@ -110,14 +110,14 @@ export class EvmProvider extends BaseProvider {
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
-    const writerParams = await this.instance.getWriterParams();
+    const helpers = await this.instance.getWriterHelpers();
 
     if (this.instance.config.tx_fn) {
       await this.writers[this.instance.config.tx_fn]({
         blockNumber,
         block,
         tx,
-        ...writerParams
+        helpers
       });
     }
 
@@ -145,7 +145,7 @@ export class EvmProvider extends BaseProvider {
           tx,
           rawEvent: event,
           eventIndex,
-          ...writerParams
+          helpers
         });
       }
     }
@@ -189,7 +189,7 @@ export class EvmProvider extends BaseProvider {
                 rawEvent: log,
                 event: parsedEvent,
                 eventIndex,
-                ...writerParams
+                helpers
               });
             }
           }

@@ -186,14 +186,14 @@ export class StarknetProvider extends BaseProvider {
     }
 
     let wasTransactionProcessed = false;
-    const writerParams = await this.instance.getWriterParams();
+    const helpers = await this.instance.getWriterHelpers();
 
     if (this.instance.config.tx_fn) {
       await this.writers[this.instance.config.tx_fn]({
         blockNumber,
         block,
         tx,
-        ...writerParams
+        helpers
       });
 
       wasTransactionProcessed = true;
@@ -223,7 +223,7 @@ export class StarknetProvider extends BaseProvider {
           tx,
           rawEvent: event,
           eventIndex,
-          ...writerParams
+          helpers
         });
 
         wasTransactionProcessed = true;
@@ -253,7 +253,7 @@ export class StarknetProvider extends BaseProvider {
           block,
           blockNumber,
           tx,
-          ...writerParams
+          helpers
         });
 
         wasTransactionProcessed = true;
@@ -289,7 +289,7 @@ export class StarknetProvider extends BaseProvider {
                 rawEvent: event,
                 event: parsedEvent,
                 eventIndex,
-                ...writerParams
+                helpers
               });
 
               wasTransactionProcessed = true;
