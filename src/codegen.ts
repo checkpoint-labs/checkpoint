@@ -14,14 +14,14 @@ import {
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
 import { extendSchema, getDerivedFromDirective } from './utils/graphql';
-import { CheckpointConfig } from './types';
+import { OverridesConfig } from './types';
 
 type TypeInfo = {
   type: string;
   initialValue: any;
 };
 
-type DecimalTypes = NonNullable<CheckpointConfig['decimal_types']>;
+type DecimalTypes = NonNullable<OverridesConfig['decimal_types']>;
 
 const DEFAULT_DECIMAL_TYPES = {
   Decimal: {
@@ -114,7 +114,7 @@ export const getJSType = (
 
 export const codegen = (
   schema: string,
-  config: CheckpointConfig,
+  config: OverridesConfig,
   format: 'typescript' | 'javascript'
 ) => {
   const decimalTypes = config.decimal_types || DEFAULT_DECIMAL_TYPES;
@@ -146,9 +146,9 @@ export const codegen = (
 
     contents +=
       format === 'javascript'
-        ? `  constructor(id) {\n`
-        : `  constructor(id: ${idType.baseType}) {\n`;
-    contents += `    super(${modelName}.tableName);\n\n`;
+        ? `  constructor(id, indexerName) {\n`
+        : `  constructor(id: ${idType.baseType}, indexerName: string) {\n`;
+    contents += `    super(${modelName}.tableName, indexerName);\n\n`;
     typeFields.forEach(field => {
       const fieldType = field.type instanceof GraphQLNonNull ? field.type.ofType : field.type;
       if (
@@ -167,11 +167,11 @@ export const codegen = (
 
     contents +=
       format === 'javascript'
-        ? `  static async loadEntity(id) {\n`
-        : `  static async loadEntity(id: ${idType.baseType}): Promise<${modelName} | null> {\n`;
-    contents += `    const entity = await super._loadEntity(${modelName}.tableName, id);\n`;
+        ? `  static async loadEntity(id, indexerName) {\n`
+        : `  static async loadEntity(id: ${idType.baseType}, indexerName: string): Promise<${modelName} | null> {\n`;
+    contents += `    const entity = await super._loadEntity(${modelName}.tableName, id, indexerName);\n`;
     contents += `    if (!entity) return null;\n\n`;
-    contents += `    const model = new ${modelName}(id);\n`;
+    contents += `    const model = new ${modelName}(id, indexerName);\n`;
     contents += `    model.setExists();\n\n`;
     contents += `    for (const key in entity) {\n`;
     contents += `      const value = entity[key] !== null && typeof entity[key] === 'object'\n`;

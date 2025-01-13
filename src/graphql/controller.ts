@@ -31,7 +31,7 @@ import {
   getNonNullType,
   getDerivedFromDirective
 } from '../utils/graphql';
-import { CheckpointConfig } from '../types';
+import { OverridesConfig } from '../types';
 import { querySingle, queryMulti, getNestedResolver } from './resolvers';
 
 /**
@@ -67,10 +67,10 @@ type WhereResult = {
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
-  private readonly decimalTypes: NonNullable<CheckpointConfig['decimal_types']>;
+  private readonly decimalTypes: NonNullable<OverridesConfig['decimal_types']>;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source, config?: CheckpointConfig) {
+  constructor(typeDefs: string | Source, config?: OverridesConfig) {
     this.schema = buildSchema(typeDefs);
     this.decimalTypes = config?.decimal_types || {
       Decimal: {
@@ -218,6 +218,7 @@ export class GqlEntityController {
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
         t.uuid('uid').primary().defaultTo(knex.fn.uuid());
+        t.string('indexer').notNullable();
         t.specificType('block_range', 'int8range').notNullable();
 
         this.getTypeFields(type).forEach(field => {
@@ -300,7 +301,17 @@ export class GqlEntityController {
       );
     }) as GraphQLObjectType[];
 
-    return this._schemaObjects;
+    return this._schemaObjects.map(type => {
+      const config = type.toConfig();
+
+      return new GraphQLObjectType({
+        ...config,
+        fields: {
+          ...config.fields,
+          indexer: { type: GraphQLString }
+        }
+      });
+    });
   }
 
   public getTypeFields<Parent, Context>(
@@ -316,7 +327,12 @@ export class GqlEntityController {
     return {
       type,
       args: {
-        id: { type: new GraphQLNonNull(this.getEntityIdType(type)) },
+        id: {
+          type: new GraphQLNonNull(this.getEntityIdType(type))
+        },
+        indexer: {
+          type: GraphQLString
+        },
         block: {
           type: GraphQLInt
         }
@@ -460,6 +476,9 @@ export class GqlEntityController {
         },
         orderDirection: {
           type: GraphQLOrderDirection
+        },
+        indexer: {
+          type: GraphQLString
         },
         block: {
           type: GraphQLInt

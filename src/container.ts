@@ -44,6 +44,7 @@ export class Container implements Instance {
     log: Logger,
     knex: Knex,
     store: CheckpointsStore,
+    entityController: GqlEntityController,
     config: CheckpointConfig,
     indexer: BaseIndexer,
     schema: string,
@@ -53,17 +54,16 @@ export class Container implements Instance {
     this.log = log.child({ component: 'container', indexer: indexerName });
     this.knex = knex;
     this.store = store;
+    this.entityController = entityController;
     this.config = config;
     this.indexer = indexer;
     this.schema = schema;
     this.opts = opts;
 
-    this.entityController = new GqlEntityController(this.schema, config);
-
     this.indexer.init({
       instance: this,
       log: this.log,
-      abis: opts?.abis
+      abis: config.abis
     });
   }
 
@@ -211,7 +211,7 @@ export class Container implements Instance {
           { blockNumber: currentBlock, err: e },
           'error occurred during checkpoint fetching'
         );
-        await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
+        await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
         continue;
       }
 
@@ -282,7 +282,7 @@ export class Container implements Instance {
         this.preloadedBlocks.unshift(preloadedBlock);
       }
 
-      await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
+      await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
       return this.next(blockNum);
     }
   }
@@ -423,7 +423,7 @@ export class Container implements Instance {
       ...templates.flatMap(template => template.events)
     ];
 
-    const missingAbis = usedAbis.filter(abi => !this.opts?.abis?.[abi]);
+    const missingAbis = usedAbis.filter(abi => !this.config.abis?.[abi]);
     const missingWriters = usedWriters.filter(
       writer => !this.indexer.getHandlers().includes(writer.fn)
     );
