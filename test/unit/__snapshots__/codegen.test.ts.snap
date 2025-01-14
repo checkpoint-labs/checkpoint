@@ -6,8 +6,8 @@ exports[`codegen should generate javascript code 1`] = `
 export class Space extends Model {
   static tableName = 'spaces';
 
-  constructor(id) {
-    super(Space.tableName);
+  constructor(id, indexerName) {
+    super(Space.tableName, indexerName);
 
     this.initialSet('id', id);
     this.initialSet('name', null);
@@ -18,13 +18,14 @@ export class Space extends Model {
     this.initialSet('quorum', 0);
     this.initialSet('strategies', "[]");
     this.initialSet('strategies_nonnull', "[]");
+    this.initialSet('indexer', "");
   }
 
-  static async loadEntity(id) {
-    const entity = await super._loadEntity(Space.tableName, id);
+  static async loadEntity(id, indexerName) {
+    const entity = await super._loadEntity(Space.tableName, id, indexerName);
     if (!entity) return null;
 
-    const model = new Space(id);
+    const model = new Space(id, indexerName);
     model.setExists();
 
     for (const key in entity) {
@@ -108,13 +109,21 @@ export class Space extends Model {
   set strategies_nonnull(value) {
     this.set('strategies_nonnull', JSON.stringify(value));
   }
+
+  get indexer() {
+    return this.get('indexer');
+  }
+
+  set indexer(value) {
+    this.set('indexer', value);
+  }
 }
 
 export class Proposal extends Model {
   static tableName = 'proposals';
 
-  constructor(id) {
-    super(Proposal.tableName);
+  constructor(id, indexerName) {
+    super(Proposal.tableName, indexerName);
 
     this.initialSet('id', id);
     this.initialSet('proposal_id', 0);
@@ -123,13 +132,14 @@ export class Proposal extends Model {
     this.initialSet('scores_total', 0);
     this.initialSet('active', false);
     this.initialSet('progress', "0");
+    this.initialSet('indexer', "");
   }
 
-  static async loadEntity(id) {
-    const entity = await super._loadEntity(Proposal.tableName, id);
+  static async loadEntity(id, indexerName) {
+    const entity = await super._loadEntity(Proposal.tableName, id, indexerName);
     if (!entity) return null;
 
-    const model = new Proposal(id);
+    const model = new Proposal(id, indexerName);
     model.setExists();
 
     for (const key in entity) {
@@ -197,6 +207,14 @@ export class Proposal extends Model {
   set progress(value) {
     this.set('progress', value);
   }
+
+  get indexer() {
+    return this.get('indexer');
+  }
+
+  set indexer(value) {
+    this.set('indexer', value);
+  }
 }
 "
 `;
@@ -207,8 +225,8 @@ exports[`codegen should generate typescript code 1`] = `
 export class Space extends Model {
   static tableName = 'spaces';
 
-  constructor(id: string) {
-    super(Space.tableName);
+  constructor(id: string, indexerName: string) {
+    super(Space.tableName, indexerName);
 
     this.initialSet('id', id);
     this.initialSet('name', null);
@@ -219,13 +237,14 @@ export class Space extends Model {
     this.initialSet('quorum', 0);
     this.initialSet('strategies', "[]");
     this.initialSet('strategies_nonnull', "[]");
+    this.initialSet('indexer', "");
   }
 
-  static async loadEntity(id: string): Promise<Space | null> {
-    const entity = await super._loadEntity(Space.tableName, id);
+  static async loadEntity(id: string, indexerName: string): Promise<Space | null> {
+    const entity = await super._loadEntity(Space.tableName, id, indexerName);
     if (!entity) return null;
 
-    const model = new Space(id);
+    const model = new Space(id, indexerName);
     model.setExists();
 
     for (const key in entity) {
@@ -309,13 +328,21 @@ export class Space extends Model {
   set strategies_nonnull(value: string[]) {
     this.set('strategies_nonnull', JSON.stringify(value));
   }
+
+  get indexer(): string {
+    return this.get('indexer');
+  }
+
+  set indexer(value: string) {
+    this.set('indexer', value);
+  }
 }
 
 export class Proposal extends Model {
   static tableName = 'proposals';
 
-  constructor(id: string) {
-    super(Proposal.tableName);
+  constructor(id: string, indexerName: string) {
+    super(Proposal.tableName, indexerName);
 
     this.initialSet('id', id);
     this.initialSet('proposal_id', 0);
@@ -324,13 +351,14 @@ export class Proposal extends Model {
     this.initialSet('scores_total', 0);
     this.initialSet('active', false);
     this.initialSet('progress', "0");
+    this.initialSet('indexer', "");
   }
 
-  static async loadEntity(id: string): Promise<Proposal | null> {
-    const entity = await super._loadEntity(Proposal.tableName, id);
+  static async loadEntity(id: string, indexerName: string): Promise<Proposal | null> {
+    const entity = await super._loadEntity(Proposal.tableName, id, indexerName);
     if (!entity) return null;
 
-    const model = new Proposal(id);
+    const model = new Proposal(id, indexerName);
     model.setExists();
 
     for (const key in entity) {
@@ -397,6 +425,14 @@ export class Proposal extends Model {
 
   set progress(value: string) {
     this.set('progress', value);
+  }
+
+  get indexer(): string {
+    return this.get('indexer');
+  }
+
+  set indexer(value: string) {
+    this.set('indexer', value);
   }
 }
 "
