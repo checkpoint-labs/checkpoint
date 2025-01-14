@@ -14,7 +14,7 @@ export default class Model {
 
   private async _update() {
     const knex = register.getKnex();
-    const currentBlock = register.getCurrentBlock();
+    const currentBlock = register.getCurrentBlock(this.indexerName);
 
     const diff = Object.fromEntries(
       [...this.values.entries()].filter(([key]) => this.valuesImplicitlySet.has(key))
@@ -45,7 +45,7 @@ export default class Model {
   }
 
   private async _insert() {
-    const currentBlock = register.getCurrentBlock();
+    const currentBlock = register.getCurrentBlock(this.indexerName);
 
     const entity = Object.fromEntries(this.values.entries());
 
@@ -60,7 +60,7 @@ export default class Model {
   }
 
   private async _delete() {
-    const currentBlock = register.getCurrentBlock();
+    const currentBlock = register.getCurrentBlock(this.indexerName);
 
     return register
       .getKnex()

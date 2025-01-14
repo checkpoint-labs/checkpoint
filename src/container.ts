@@ -246,7 +246,7 @@ export class Container implements Instance {
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     try {
-      register.setCurrentBlock(BigInt(blockNum));
+      register.setCurrentBlock(this.indexerName, BigInt(blockNum));
 
       const initialSources = this.getCurrentSources(blockNum);
       const parentHash = await this.getBlockHash(blockNum - 1);
