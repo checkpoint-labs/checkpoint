@@ -218,7 +218,6 @@ export class GqlEntityController {
 
       builder = builder.dropTableIfExists(tableName).createTable(tableName, t => {
         t.uuid('uid').primary().defaultTo(knex.fn.uuid());
-        t.string('indexer').notNullable();
         t.specificType('block_range', 'int8range').notNullable();
 
         this.getTypeFields(type).forEach(field => {
@@ -250,9 +249,10 @@ export class GqlEntityController {
       if (knex.client.config.client === 'pg') {
         builder = builder.raw(
           knex
-            .raw('ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, block_range WITH &&)', [
-              tableName
-            ])
+            .raw(
+              'ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, indexer WITH =, block_range WITH &&)',
+              [tableName]
+            )
             .toQuery()
         );
       }
@@ -301,17 +301,7 @@ export class GqlEntityController {
       );
     }) as GraphQLObjectType[];
 
-    return this._schemaObjects.map(type => {
-      const config = type.toConfig();
-
-      return new GraphQLObjectType({
-        ...config,
-        fields: {
-          ...config.fields,
-          indexer: { type: GraphQLString }
-        }
-      });
-    });
+    return this._schemaObjects;
   }
 
   public getTypeFields<Parent, Context>(

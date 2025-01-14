@@ -4,14 +4,58 @@ import {
   isLeafType,
   isListType,
   GraphQLScalarType,
-  GraphQLField
+  GraphQLField,
+  parse,
+  visit,
+  print
 } from 'graphql';
 import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import pluralize from 'pluralize';
 
 export const extendSchema = (schema: string): string => {
-  return `directive @derivedFrom(field: String!) on FIELD_DEFINITION
-${schema}`;
+  const ast = parse(schema);
+
+  const updatedAst = visit(ast, {
+    Document(node) {
+      const directiveDefinition = {
+        kind: 'DirectiveDefinition',
+        name: { kind: 'Name', value: 'derivedFrom' },
+        arguments: [
+          {
+            kind: 'InputValueDefinition',
+            name: { kind: 'Name', value: 'field' },
+            type: {
+              kind: 'NonNullType',
+              type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } }
+            }
+          }
+        ],
+        locations: [{ kind: 'Name', value: 'FIELD_DEFINITION' }]
+      };
+
+      return {
+        ...node,
+        definitions: [directiveDefinition, ...node.definitions]
+      };
+    },
+    ObjectTypeDefinition(node) {
+      const indexerField = {
+        kind: 'FieldDefinition',
+        name: { kind: 'Name', value: 'indexer' },
+        type: {
+          kind: 'NonNullType',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } }
+        }
+      };
+
+      return {
+        ...node,
+        fields: node.fields ? [...node.fields, indexerField] : [indexerField]
+      };
+    }
+  });
+
+  return print(updatedAst);
 };
 
 /**

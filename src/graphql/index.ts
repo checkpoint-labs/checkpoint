@@ -83,6 +83,7 @@ export const MetadataGraphQLObject = new GraphQLObjectType({
   description: 'Core metadata values used internally by Checkpoint',
   fields: {
     id: { type: new GraphQLNonNull(GraphQLID), description: 'example: last_indexed_block' },
+    indexer: { type: new GraphQLNonNull(GraphQLString) },
     value: { type: GraphQLString }
   }
 });
@@ -100,6 +101,7 @@ export const CheckpointsGraphQLObject = new GraphQLObjectType({
       type: new GraphQLNonNull(GraphQLID),
       description: 'id computed as last 5 bytes of sha256(contract+block)'
     },
+    indexer: { type: new GraphQLNonNull(GraphQLString) },
     block_number: {
       type: new GraphQLNonNull(GraphQLInt)
     },
