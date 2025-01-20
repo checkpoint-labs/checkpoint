@@ -18,7 +18,7 @@ export class Space extends Model {
     this.initialSet('quorum', 0);
     this.initialSet('strategies', "[]");
     this.initialSet('strategies_nonnull', "[]");
-    this.initialSet('indexer', "");
+    this.initialSet('_indexer', "");
   }
 
   static async loadEntity(id, indexerName) {
@@ -110,12 +110,12 @@ export class Space extends Model {
     this.set('strategies_nonnull', JSON.stringify(value));
   }
 
-  get indexer() {
-    return this.get('indexer');
+  get _indexer() {
+    return this.get('_indexer');
   }
 
-  set indexer(value) {
-    this.set('indexer', value);
+  set _indexer(value) {
+    this.set('_indexer', value);
   }
 }
 
@@ -132,7 +132,7 @@ export class Proposal extends Model {
     this.initialSet('scores_total', 0);
     this.initialSet('active', false);
     this.initialSet('progress', "0");
-    this.initialSet('indexer', "");
+    this.initialSet('_indexer', "");
   }
 
   static async loadEntity(id, indexerName) {
@@ -208,12 +208,12 @@ export class Proposal extends Model {
     this.set('progress', value);
   }
 
-  get indexer() {
-    return this.get('indexer');
+  get _indexer() {
+    return this.get('_indexer');
   }
 
-  set indexer(value) {
-    this.set('indexer', value);
+  set _indexer(value) {
+    this.set('_indexer', value);
   }
 }
 "
@@ -237,7 +237,7 @@ export class Space extends Model {
     this.initialSet('quorum', 0);
     this.initialSet('strategies', "[]");
     this.initialSet('strategies_nonnull', "[]");
-    this.initialSet('indexer', "");
+    this.initialSet('_indexer', "");
   }
 
   static async loadEntity(id: string, indexerName: string): Promise<Space | null> {
@@ -329,12 +329,12 @@ export class Space extends Model {
     this.set('strategies_nonnull', JSON.stringify(value));
   }
 
-  get indexer(): string {
-    return this.get('indexer');
+  get _indexer(): string {
+    return this.get('_indexer');
   }
 
-  set indexer(value: string) {
-    this.set('indexer', value);
+  set _indexer(value: string) {
+    this.set('_indexer', value);
   }
 }
 
@@ -351,7 +351,7 @@ export class Proposal extends Model {
     this.initialSet('scores_total', 0);
     this.initialSet('active', false);
     this.initialSet('progress', "0");
-    this.initialSet('indexer', "");
+    this.initialSet('_indexer', "");
   }
 
   static async loadEntity(id: string, indexerName: string): Promise<Proposal | null> {
@@ -427,12 +427,12 @@ export class Proposal extends Model {
     this.set('progress', value);
   }
 
-  get indexer(): string {
-    return this.get('indexer');
+  get _indexer(): string {
+    return this.get('_indexer');
   }
 
-  set indexer(value: string) {
-    this.set('indexer', value);
+  set _indexer(value: string) {
+    this.set('_indexer', value);
   }
 }
 "

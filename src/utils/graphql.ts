@@ -41,7 +41,7 @@ export const extendSchema = (schema: string): string => {
     ObjectTypeDefinition(node) {
       const indexerField = {
         kind: 'FieldDefinition',
-        name: { kind: 'Name', value: 'indexer' },
+        name: { kind: 'Name', value: '_indexer' },
         type: {
           kind: 'NonNullType',
           type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } }

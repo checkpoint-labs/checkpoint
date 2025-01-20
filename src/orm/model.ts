@@ -24,7 +24,7 @@ export default class Model {
       await trx
         .table(this.tableName)
         .where('id', this.get('id'))
-        .andWhere('indexer', this.indexerName)
+        .andWhere('_indexer', this.indexerName)
         .andWhereRaw('upper_inf(block_range)')
         .update({
           block_range: knex.raw('int8range(lower(block_range), ?)', [currentBlock])
@@ -54,7 +54,7 @@ export default class Model {
       .table(this.tableName)
       .insert({
         ...entity,
-        indexer: this.indexerName,
+        _indexer: this.indexerName,
         block_range: register.getKnex().raw('int8range(?, NULL)', [currentBlock])
       });
   }
@@ -66,7 +66,7 @@ export default class Model {
       .getKnex()
       .table(this.tableName)
       .where('id', this.get('id'))
-      .andWhere('indexer', this.indexerName)
+      .andWhere('_indexer', this.indexerName)
       .update({
         block_range: register.getKnex().raw('int8range(lower(block_range), ?)', [currentBlock])
       });
@@ -100,7 +100,7 @@ export default class Model {
       .table(tableName)
       .select('*')
       .where('id', id)
-      .andWhere('indexer', indexerName)
+      .andWhere('_indexer', indexerName)
       .andWhereRaw('upper_inf(block_range)')
       .first();
     if (!entity) return null;

@@ -250,7 +250,7 @@ export class GqlEntityController {
         builder = builder.raw(
           knex
             .raw(
-              'ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, indexer WITH =, block_range WITH &&)',
+              'ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, _indexer WITH =, block_range WITH &&)',
               [tableName]
             )
             .toQuery()

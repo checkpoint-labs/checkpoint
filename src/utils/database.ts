@@ -26,9 +26,11 @@ export function applyQueryFilter(
   tableName: string,
   filters: QueryFilter
 ) {
+  const isInternalTable = INTERNAL_TABLES.includes(tableName);
+
   let filteredQuery = query;
 
-  if (!INTERNAL_TABLES.includes(tableName)) {
+  if (!isInternalTable) {
     filteredQuery =
       filters.block !== undefined
         ? query.andWhereRaw(`${tableName}.block_range @> int8(??)`, [filters.block])
@@ -36,7 +38,9 @@ export function applyQueryFilter(
   }
 
   if (filters.indexer !== undefined) {
-    filteredQuery = query.andWhere(`${tableName}.indexer`, filters.indexer);
+    const columnName = isInternalTable ? 'indexer' : `_indexer`;
+
+    filteredQuery = query.andWhere(`${tableName}.${columnName}`, filters.indexer);
   }
 
   return filteredQuery;
