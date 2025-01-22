@@ -6,13 +6,13 @@ import process from 'process';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import { codegen } from '../codegen';
-import { CheckpointConfig } from '../types';
+import { OverridesConfig } from '../types';
 
-const DEFAULT_CONFIG_PATH = 'src/config.json';
+const DEFAULT_CONFIG_PATH = 'src/overrides.json';
 const DEFAULT_SCHEMA_PATH = 'src/schema.gql';
 const OUTPUT_DIRECTORY = '.checkpoint';
 
-async function generate(schemaFile: string, configFile: string, format: string) {
+async function generate(schemaFile: string, overridesConfigFile: string, format: string) {
   if (format !== 'typescript' && format !== 'javascript') {
     throw new Error('Invalid output format');
   }
@@ -21,10 +21,14 @@ async function generate(schemaFile: string, configFile: string, format: string) 
 
   const cwd = process.cwd();
   const schemaFilePath = path.join(cwd, schemaFile);
-  const configFilePath = path.join(cwd, configFile);
+  const overridesConfigFilePath = path.join(cwd, overridesConfigFile);
 
   const schema = await fs.readFile(schemaFilePath, 'utf8');
-  const config: CheckpointConfig = await import(configFilePath);
+
+  let config: OverridesConfig = {};
+  try {
+    config = await import(overridesConfigFilePath);
+  } catch (err) {}
 
   const generatedModels = codegen(schema, config, format);
 
@@ -49,11 +53,11 @@ yargs(hideBin(process.argv))
           default: DEFAULT_SCHEMA_PATH,
           description: 'Schema file path'
         })
-        .option('config-file', {
-          alias: 'c',
+        .option('overrides-config-file', {
+          alias: 'o',
           type: 'string',
           default: DEFAULT_CONFIG_PATH,
-          description: 'Config file path'
+          description: 'Overrides config file path'
         })
         .option('output-format', {
           alias: 'f',
@@ -64,7 +68,7 @@ yargs(hideBin(process.argv))
     },
     async argv => {
       try {
-        await generate(argv['schema-file'], argv['config-file'], argv['output-format']);
+        await generate(argv['schema-file'], argv['overrides-config-file'], argv['output-format']);
       } catch (err) {
         console.error('Error generating models:', err);
         process.exit(1);

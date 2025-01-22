@@ -15,33 +15,21 @@ import { register } from './register';
 import { CheckpointConfig, CheckpointOptions } from './types';
 import { Container } from './container';
 
-const INDEXER_NAME = 'default';
-
 export default class Checkpoint {
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
 
-  private container: Container;
+  private containers: Map<string, Container> = new Map();
 
+  private schema: string;
   private dbConnection: string;
   private knex: Knex;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
 
-  constructor(
-    config: CheckpointConfig,
-    indexer: BaseIndexer,
-    schema: string,
-    opts?: CheckpointOptions
-  ) {
-    const validationResult = checkpointConfigSchema.safeParse(config);
-    if (validationResult.success === false) {
-      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
-    }
-
-    const extendedSchema = extendSchema(schema);
-
-    this.entityController = new GqlEntityController(extendedSchema, config);
+  constructor(schema: string, opts?: CheckpointOptions) {
+    this.schema = extendSchema(schema);
+    this.entityController = new GqlEntityController(this.schema, opts?.overridesConfig);
 
     this.log = createLogger({
       base: { component: 'checkpoint' },
@@ -65,20 +53,35 @@ export default class Checkpoint {
     this.knex = createKnex(dbConnection);
     this.dbConnection = dbConnection;
 
-    this.container = new Container(
-      INDEXER_NAME,
+    register.setKnex(this.knex);
+  }
+
+  public addIndexer(
+    name: string,
+    config: CheckpointConfig,
+    indexer: BaseIndexer,
+    opts?: CheckpointOptions
+  ) {
+    const validationResult = checkpointConfigSchema.safeParse(config);
+    if (validationResult.success === false) {
+      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
+    }
+
+    const container = new Container(
+      name,
       this.log,
       this.knex,
       this.store,
+      this.entityController,
       config,
       indexer,
-      extendedSchema,
+      this.schema,
       opts
     );
 
-    this.container.validateConfig();
+    container.validateConfig();
 
-    register.setKnex(this.knex);
+    this.containers.set(name, container);
   }
 
   public getBaseContext() {
@@ -131,7 +134,7 @@ export default class Checkpoint {
   public async start() {
     this.log.debug('starting');
 
-    await this.container.start();
+    await Promise.all([...this.containers.values()].map(container => container.start()));
   }
 
   /**
@@ -150,7 +153,9 @@ export default class Checkpoint {
   public async reset() {
     this.log.debug('reset');
 
-    await this.container.reset();
+    for (const container of this.containers.values()) {
+      await container.reset();
+    }
   }
 
   /**
@@ -161,7 +166,11 @@ export default class Checkpoint {
    *
    */
   public async resetMetadata() {
-    await this.container.resetMetadata();
+    this.log.debug('reset metadata');
+
+    for (const container of this.containers.values()) {
+      await container.resetMetadata();
+    }
   }
 
   /**
@@ -174,10 +183,18 @@ export default class Checkpoint {
    *
    */
   public async seedCheckpoints(
+    indexerName: string,
     checkpointBlocks: { contract: string; blocks: number[] }[]
   ): Promise<void> {
     await this.store.createStore();
-    await this.container.seedCheckpoints(checkpointBlocks);
+
+    const container = this.containers.get(indexerName);
+
+    if (!container) {
+      throw new Error(`Container ${indexerName} not found`);
+    }
+
+    container.seedCheckpoints(checkpointBlocks);
   }
 
   private get store(): CheckpointsStore {

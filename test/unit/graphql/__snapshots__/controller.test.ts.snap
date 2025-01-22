@@ -19,8 +19,8 @@ create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
-  vote(id: Int!, block: Int): Vote
-  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, block: Int, where: Vote_filter): [Vote]
+  vote(id: Int!, indexer: String, block: Int): Vote
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote]
 }
 
 type Vote {

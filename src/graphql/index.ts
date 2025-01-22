@@ -9,7 +9,7 @@ import {
 } from 'graphql';
 import DataLoader from 'dataloader';
 import { ResolverContextInput } from './resolvers';
-import { getTableName, applyBlockFilter } from '../utils/database';
+import { getTableName, applyQueryFilter, QueryFilter } from '../utils/database';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -20,7 +20,7 @@ import { getTableName, applyBlockFilter } from '../utils/database';
 export const createGetLoader = (context: ResolverContextInput) => {
   const loaders = {};
 
-  return (name: string, field = 'id', block?: number) => {
+  return (name: string, field = 'id', filter: QueryFilter) => {
     const key = `${name}-${field}`;
 
     if (!loaders[key]) {
@@ -31,7 +31,7 @@ export const createGetLoader = (context: ResolverContextInput) => {
           .select('*')
           .from(tableName)
           .whereIn(field, ids as string[]);
-        query = applyBlockFilter(query, tableName, block);
+        query = applyQueryFilter(query, tableName, filter);
 
         context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
 
@@ -83,6 +83,7 @@ export const MetadataGraphQLObject = new GraphQLObjectType({
   description: 'Core metadata values used internally by Checkpoint',
   fields: {
     id: { type: new GraphQLNonNull(GraphQLID), description: 'example: last_indexed_block' },
+    indexer: { type: new GraphQLNonNull(GraphQLString) },
     value: { type: GraphQLString }
   }
 });
@@ -100,6 +101,7 @@ export const CheckpointsGraphQLObject = new GraphQLObjectType({
       type: new GraphQLNonNull(GraphQLID),
       description: 'id computed as last 5 bytes of sha256(contract+block)'
     },
+    indexer: { type: new GraphQLNonNull(GraphQLString) },
     block_number: {
       type: new GraphQLNonNull(GraphQLInt)
     },

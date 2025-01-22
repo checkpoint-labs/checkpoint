@@ -21,6 +21,16 @@ export const contractTemplateSchema = z.object({
 export const checkpointConfigSchema = z.object({
   network_node_url: z.string().url(),
   optimistic_indexing: z.boolean().optional(),
+  fetch_interval: z.number().optional(),
+  start: z.number().gte(0).optional(),
+  tx_fn: z.string().optional(),
+  global_events: z.array(contractEventConfigSchema).optional(),
+  sources: z.array(contractSourceConfigSchema).optional(),
+  templates: z.record(contractTemplateSchema).optional(),
+  abis: z.record(z.any()).optional()
+});
+
+export const overridesConfigSchema = z.object({
   decimal_types: z
     .record(
       z.object({
@@ -28,10 +38,5 @@ export const checkpointConfigSchema = z.object({
         d: z.number()
       })
     )
-    .optional(),
-  start: z.number().gte(0).optional(),
-  tx_fn: z.string().optional(),
-  global_events: z.array(contractEventConfigSchema).optional(),
-  sources: z.array(contractSourceConfigSchema).optional(),
-  templates: z.record(contractTemplateSchema).optional()
+    .optional()
 });

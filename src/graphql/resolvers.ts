@@ -16,12 +16,13 @@ import {
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import { getNonNullType, getDerivedFromDirective } from '../utils/graphql';
-import { getTableName, applyBlockFilter } from '../utils/database';
+import { getTableName, applyQueryFilter, QueryFilter } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
 
 type BaseArgs = {
   block?: number;
+  indexer?: string;
 };
 
 type SingleEntitySource = Record<string, any> & {
@@ -51,7 +52,11 @@ export type ResolverContextInput = {
 };
 
 export type ResolverContext = ResolverContextInput & {
-  getLoader: (name: string, field?: string, block?: number) => DataLoader<readonly unknown[], any>;
+  getLoader: (
+    name: string,
+    field: string,
+    queryFilter: QueryFilter
+  ) => DataLoader<readonly unknown[], any>;
 };
 
 export async function queryMulti(
@@ -71,7 +76,10 @@ export async function queryMulti(
   const nestedEntitiesMappings = {} as Record<string, Record<string, string>>;
 
   let query = knex.select(`${tableName}.*`).from(tableName);
-  query = applyBlockFilter(query, tableName, args.block);
+  query = applyQueryFilter(query, tableName, {
+    block: args.block,
+    indexer: args.indexer
+  });
 
   const handleWhere = (query: Knex.QueryBuilder, prefix: string, where: Record<string, any>) => {
     const isFieldList = (fieldName: string) => {
@@ -167,7 +175,10 @@ export async function queryMulti(
           .columns(nestedEntitiesMappings[fieldName])
           .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
 
-        query = applyBlockFilter(query, nestedTableName, args.block);
+        query = applyQueryFilter(query, tableName, {
+          block: args.block,
+          indexer: args.indexer
+        });
 
         handleWhere(query, nestedTableName, w[1]);
       } else {
@@ -219,7 +230,8 @@ export async function queryMulti(
       ...formatItem(item, jsonFields),
       ...nested,
       _args: {
-        block: args.block
+        block: args.block,
+        indexer: args.indexer
       }
     };
   });
@@ -231,7 +243,10 @@ export async function querySingle(
   context: ResolverContext,
   info: GraphQLResolveInfo
 ): Promise<Result | null> {
-  const block = parent?._args.block ?? args.block;
+  const queryFilter = {
+    block: parent?._args.block ?? args.block,
+    indexer: parent?._args.indexer ?? args.indexer
+  };
 
   const returnType = getNonNullType(info.returnType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
@@ -243,7 +258,7 @@ export async function querySingle(
   if (alreadyResolvedInParent) {
     return {
       ...formatItem(parentResolvedValue, jsonFields),
-      _args: { block }
+      _args: queryFilter
     };
   }
 
@@ -253,19 +268,19 @@ export async function querySingle(
     const simplified = simplifyParsedResolveInfoFragmentWithType(parsed, returnType);
 
     if (Object.keys(simplified.fields).length === 1 && simplified.fields['id']) {
-      return { id: parentResolvedValue, _args: { block } };
+      return { id: parentResolvedValue, _args: queryFilter };
     }
   }
 
   const id = parentResolvedValue || args.id;
-  const items = await context.getLoader(returnType.name.toLowerCase(), 'id', block).load(id);
+  const items = await context.getLoader(returnType.name.toLowerCase(), 'id', queryFilter).load(id);
   if (items.length === 0) {
     throw new Error(`Row not found: ${id}`);
   }
 
   return {
     ...formatItem(items[0], jsonFields),
-    _args: { block }
+    _args: queryFilter
   };
 }
 
@@ -279,7 +294,10 @@ export const getNestedResolver =
   ): Promise<Result[]> => {
     const { knex, getLoader } = context;
 
-    const block = parent._args?.block;
+    const queryFilter = {
+      block: parent._args?.block,
+      indexer: parent._args?.indexer
+    };
 
     const returnType = getNonNullType(info.returnType) as GraphQLList<GraphQLObjectType>;
     const jsonFields = getJsonFields(returnType.ofType);
@@ -298,19 +316,19 @@ export const getNestedResolver =
       const tableName = getTableName(columnName);
       const query = knex.select('*').from(tableName).whereIn('id', parent[info.fieldName]);
 
-      result = await applyBlockFilter(query, tableName, block);
+      result = await applyQueryFilter(query, tableName, queryFilter);
     } else {
       const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
       if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
         throw new Error(`field ${field.name} is missing field in derivedFrom directive`);
       }
 
-      result = await getLoader(columnName, fieldArgument.value.value, block).load(parent.id);
+      result = await getLoader(columnName, fieldArgument.value.value, queryFilter).load(parent.id);
     }
 
     return result.map(item => ({
       ...formatItem(item, jsonFields),
-      _args: { block }
+      _args: queryFilter
     }));
   };
 
