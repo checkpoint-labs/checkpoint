@@ -31,7 +31,7 @@ import {
   getNonNullType,
   getDerivedFromDirective
 } from '../utils/graphql';
-import { CheckpointConfig } from '../types';
+import { OverridesConfig } from '../types';
 import { querySingle, queryMulti, getNestedResolver } from './resolvers';
 
 /**
@@ -67,10 +67,10 @@ type WhereResult = {
  */
 export class GqlEntityController {
   private readonly schema: GraphQLSchema;
-  private readonly decimalTypes: NonNullable<CheckpointConfig['decimal_types']>;
+  private readonly decimalTypes: NonNullable<OverridesConfig['decimal_types']>;
   private _schemaObjects?: GraphQLObjectType[];
 
-  constructor(typeDefs: string | Source, config?: CheckpointConfig) {
+  constructor(typeDefs: string | Source, config?: OverridesConfig) {
     this.schema = buildSchema(typeDefs);
     this.decimalTypes = config?.decimal_types || {
       Decimal: {
@@ -249,9 +249,10 @@ export class GqlEntityController {
       if (knex.client.config.client === 'pg') {
         builder = builder.raw(
           knex
-            .raw('ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, block_range WITH &&)', [
-              tableName
-            ])
+            .raw(
+              'ALTER TABLE ?? ADD EXCLUDE USING GIST (id WITH =, _indexer WITH =, block_range WITH &&)',
+              [tableName]
+            )
             .toQuery()
         );
       }
@@ -316,7 +317,12 @@ export class GqlEntityController {
     return {
       type,
       args: {
-        id: { type: new GraphQLNonNull(this.getEntityIdType(type)) },
+        id: {
+          type: new GraphQLNonNull(this.getEntityIdType(type))
+        },
+        indexer: {
+          type: GraphQLString
+        },
         block: {
           type: GraphQLInt
         }
@@ -460,6 +466,9 @@ export class GqlEntityController {
         },
         orderDirection: {
           type: GraphQLOrderDirection
+        },
+        indexer: {
+          type: GraphQLString
         },
         block: {
           type: GraphQLInt

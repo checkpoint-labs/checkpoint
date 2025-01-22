@@ -171,16 +171,13 @@ describe('getJSType', () => {
 });
 
 describe('codegen', () => {
-  const config = {
-    network_node_url: '',
-    sources: []
-  };
+  const overridesConfig = {};
 
   it('should generate typescript code', () => {
-    expect(codegen(SCHEMA_SOURCE, config, 'typescript')).toMatchSnapshot();
+    expect(codegen(SCHEMA_SOURCE, overridesConfig, 'typescript')).toMatchSnapshot();
   });
 
   it('should generate javascript code', () => {
-    expect(codegen(SCHEMA_SOURCE, config, 'javascript')).toMatchSnapshot();
+    expect(codegen(SCHEMA_SOURCE, overridesConfig, 'javascript')).toMatchSnapshot();
   });
 });

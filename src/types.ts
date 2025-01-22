@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import Checkpoint from './checkpoint';
 import { LogLevel } from './utils/logger';
 import {
   contractSourceConfigSchema,
   contractTemplateSchema,
-  checkpointConfigSchema
+  checkpointConfigSchema,
+  overridesConfigSchema
 } from './schemas';
+import { Instance } from './providers';
 
 export type TemplateSource = {
   contractAddress: string;
@@ -22,23 +23,21 @@ export interface CheckpointOptions {
   // optionally format logs to pretty output.
   // Not recommended for production.
   prettifyLogs?: boolean;
-  // Optional interval in milliseconds to check for new blocks.
-  fetchInterval?: number;
   // Optional database connection string. For now only accepts PostgreSQL and MySQL/MariaDB
   // connection string. If no provided will default to looking up a value in
   // the DATABASE_URL environment.
   dbConnection?: string;
-  // Abis for contracts needed for automatic event parsing
-  abis?: Record<string, any>;
+  overridesConfig?: OverridesConfig;
 }
 
 export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;
 export type ContractTemplate = z.infer<typeof contractTemplateSchema>;
 export type CheckpointConfig = z.infer<typeof checkpointConfigSchema>;
+export type OverridesConfig = z.infer<typeof overridesConfigSchema>;
 
 export type BaseWriterParams = {
   blockNumber: number;
   eventIndex?: number;
   source?: ContractSourceConfig;
-  instance: Checkpoint;
+  helpers: ReturnType<Instance['getWriterHelpers']>;
 };

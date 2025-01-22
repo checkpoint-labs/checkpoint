@@ -4,64 +4,32 @@ import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
-import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
-import { BaseIndexer, BlockNotFoundError, ReorgDetectedError } from './providers';
+import { CheckpointsStore } from './stores/checkpoints';
+import { BaseIndexer } from './providers';
 import { createLogger, Logger, LogLevel } from './utils/logger';
-import { getConfigChecksum, getContractsFromConfig } from './utils/checkpoint';
 import { extendSchema } from './utils/graphql';
 import { createKnex } from './knex';
 import { createPgPool } from './pg';
 import { checkpointConfigSchema } from './schemas';
 import { register } from './register';
-import { sleep } from './utils/helpers';
-import { ContractSourceConfig, CheckpointConfig, CheckpointOptions, TemplateSource } from './types';
-import { getTableName } from './utils/database';
-
-const SCHEMA_VERSION = 1;
-
-const BLOCK_PRELOAD_START_RANGE = 1000;
-const BLOCK_RELOAD_MIN_RANGE = 10;
-const BLOCK_PRELOAD_STEP = 100;
-const BLOCK_PRELOAD_TARGET = 10;
-const BLOCK_PRELOAD_OFFSET = 50;
-const DEFAULT_FETCH_INTERVAL = 2000;
+import { CheckpointConfig, CheckpointOptions } from './types';
+import { Container } from './container';
 
 export default class Checkpoint {
-  public config: CheckpointConfig;
-  public opts?: CheckpointOptions;
-  public schema: string;
-
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
-  private readonly indexer: BaseIndexer;
 
+  private containers: Map<string, Container> = new Map();
+
+  private schema: string;
   private dbConnection: string;
   private knex: Knex;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
-  private activeTemplates: TemplateSource[] = [];
-  private preloadStep: number = BLOCK_PRELOAD_START_RANGE;
-  private preloadedBlocks: number[] = [];
-  private preloadEndBlock = 0;
-  private cpBlocksCache: number[] | null;
-  private blockHashCache: { blockNumber: number; hash: string } | null = null;
 
-  constructor(
-    config: CheckpointConfig,
-    indexer: BaseIndexer,
-    schema: string,
-    opts?: CheckpointOptions
-  ) {
-    const validationResult = checkpointConfigSchema.safeParse(config);
-    if (validationResult.success === false) {
-      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
-    }
-
-    this.config = config;
-    this.opts = opts;
+  constructor(schema: string, opts?: CheckpointOptions) {
     this.schema = extendSchema(schema);
-
-    this.entityController = new GqlEntityController(this.schema, config);
+    this.entityController = new GqlEntityController(this.schema, opts?.overridesConfig);
 
     this.log = createLogger({
       base: { component: 'checkpoint' },
@@ -75,17 +43,6 @@ export default class Checkpoint {
         : {})
     });
 
-    this.indexer = indexer;
-    this.indexer.init({
-      instance: this,
-      log: this.log,
-      abis: opts?.abis
-    });
-
-    this.validateConfig();
-
-    this.cpBlocksCache = [];
-
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
     if (!dbConnection) {
       throw new Error(
@@ -97,6 +54,34 @@ export default class Checkpoint {
     this.dbConnection = dbConnection;
 
     register.setKnex(this.knex);
+  }
+
+  public addIndexer(
+    name: string,
+    config: CheckpointConfig,
+    indexer: BaseIndexer,
+    opts?: CheckpointOptions
+  ) {
+    const validationResult = checkpointConfigSchema.safeParse(config);
+    if (validationResult.success === false) {
+      throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
+    }
+
+    const container = new Container(
+      name,
+      this.log,
+      this.knex,
+      this.store,
+      this.entityController,
+      config,
+      indexer,
+      this.schema,
+      opts
+    );
+
+    container.validateConfig();
+
+    this.containers.set(name, container);
   }
 
   public getBaseContext() {
@@ -139,16 +124,6 @@ export default class Checkpoint {
     return getGraphQL(schema, this.getBaseContext(), this.entityController.generateSampleQuery());
   }
 
-  public get sourceContracts() {
-    return this.indexer.getProvider().formatAddresses(getContractsFromConfig(this.config));
-  }
-
-  public getCurrentSources(blockNumber: number) {
-    if (!this.config.sources) return [];
-
-    return this.config.sources.filter(source => source.start <= blockNumber);
-  }
-
   /**
    * Starts the indexer.
    *
@@ -159,28 +134,7 @@ export default class Checkpoint {
   public async start() {
     this.log.debug('starting');
 
-    await this.validateStore();
-    await this.indexer.getProvider().init();
-
-    const templateSources = await this.store.getTemplateSources();
-    await Promise.all(
-      templateSources.map(source =>
-        this.executeTemplate(
-          source.template,
-          {
-            contract: source.contractAddress,
-            start: source.startBlock
-          },
-          false
-        )
-      )
-    );
-
-    const blockNum = await this.getStartBlockNum();
-    this.preloadEndBlock =
-      (await this.indexer.getProvider().getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
-
-    return await this.next(blockNum);
+    await Promise.all([...this.containers.values()].map(container => container.start()));
   }
 
   /**
@@ -199,12 +153,9 @@ export default class Checkpoint {
   public async reset() {
     this.log.debug('reset');
 
-    await this.store.createStore();
-    await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
-    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
-    await this.store.removeBlocks();
-
-    await this.entityController.createEntityStores(this.knex);
+    for (const container of this.containers.values()) {
+      await container.reset();
+    }
   }
 
   /**
@@ -215,49 +166,11 @@ export default class Checkpoint {
    *
    */
   public async resetMetadata() {
-    await this.store.resetStore();
-    await this.store.setMetadata(MetadataId.SchemaVersion, SCHEMA_VERSION);
-  }
+    this.log.debug('reset metadata');
 
-  private addSource(source: ContractSourceConfig) {
-    if (!this.config.sources) this.config.sources = [];
-
-    this.config.sources.push(source);
-    this.cpBlocksCache = [];
-  }
-
-  public async executeTemplate(
-    name: string,
-    { contract, start }: { contract: string; start: number },
-    persist = true
-  ) {
-    const template = this.config.templates?.[name];
-
-    if (!template) {
-      this.log.warn({ name }, 'template not found');
-      return;
+    for (const container of this.containers.values()) {
+      await container.resetMetadata();
     }
-
-    const existingTemplate = this.activeTemplates.find(
-      template =>
-        template.template === name &&
-        template.contractAddress === contract &&
-        template.startBlock === start
-    );
-
-    if (existingTemplate) return;
-    this.activeTemplates.push({ template: name, contractAddress: contract, startBlock: start });
-
-    if (persist) {
-      await this.store.insertTemplateSource(contract, start, name);
-    }
-
-    this.addSource({
-      contract,
-      start,
-      abi: template.abi,
-      events: template.events
-    });
   }
 
   /**
@@ -270,222 +183,18 @@ export default class Checkpoint {
    *
    */
   public async seedCheckpoints(
+    indexerName: string,
     checkpointBlocks: { contract: string; blocks: number[] }[]
   ): Promise<void> {
     await this.store.createStore();
 
-    const checkpoints: CheckpointRecord[] = [];
+    const container = this.containers.get(indexerName);
 
-    let finalBlock = 0;
-    checkpointBlocks.forEach(cp => {
-      cp.blocks.forEach(blockNumber => {
-        finalBlock = Math.max(finalBlock, blockNumber);
-        checkpoints.push({
-          blockNumber,
-          contractAddress: cp.contract
-        });
-      });
-    });
-
-    await this.store.insertCheckpoints(checkpoints);
-  }
-
-  public async setBlockHash(blockNum: number, hash: string) {
-    this.blockHashCache = { blockNumber: blockNum, hash };
-
-    return this.store.setBlockHash(blockNum, hash);
-  }
-
-  public async setLastIndexedBlock(block: number) {
-    await this.store.setMetadata(MetadataId.LastIndexedBlock, block);
-  }
-
-  public async insertCheckpoints(checkpoints: CheckpointRecord[]) {
-    await this.store.insertCheckpoints(checkpoints);
-  }
-
-  public async getWriterParams(): Promise<{
-    instance: Checkpoint;
-  }> {
-    return {
-      instance: this
-    };
-  }
-
-  private getConfigStartBlock() {
-    if (this.config.start && (this.config.tx_fn || this.config.global_events)) {
-      return this.config.start;
+    if (!container) {
+      throw new Error(`Container ${indexerName} not found`);
     }
 
-    return Math.min(...(this.config.sources?.map(source => source.start) || []));
-  }
-
-  private async getStartBlockNum() {
-    const start = this.getConfigStartBlock();
-    const lastBlock = (await this.store.getMetadataNumber(MetadataId.LastIndexedBlock)) ?? 0;
-
-    const nextBlock = lastBlock + 1;
-
-    return nextBlock > start ? nextBlock : start;
-  }
-
-  private async preload(blockNum: number) {
-    if (this.preloadedBlocks.length > 0) return this.preloadedBlocks.shift() as number;
-
-    let currentBlock = blockNum;
-
-    while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
-      let checkpoints: CheckpointRecord[];
-      try {
-        checkpoints = await this.indexer.getProvider().getCheckpointsRange(currentBlock, endBlock);
-      } catch (e) {
-        this.log.error(
-          { blockNumber: currentBlock, err: e },
-          'error occurred during checkpoint fetching'
-        );
-        await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
-        continue;
-      }
-
-      const increase =
-        checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
-      this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
-
-      if (checkpoints.length > 0) {
-        this.preloadedBlocks = [...new Set(checkpoints.map(cp => cp.blockNumber).sort())];
-        return this.preloadedBlocks.shift() as number;
-      }
-
-      currentBlock = endBlock + 1;
-    }
-
-    return null;
-  }
-
-  private async next(blockNum: number) {
-    let checkpointBlock, preloadedBlock;
-    if (!this.config.tx_fn && !this.config.global_events) {
-      checkpointBlock = await this.getNextCheckpointBlock(blockNum);
-
-      if (checkpointBlock) {
-        blockNum = checkpointBlock;
-      } else if (blockNum <= this.preloadEndBlock) {
-        preloadedBlock = await this.preload(blockNum);
-        blockNum = preloadedBlock || this.preloadEndBlock + 1;
-      }
-    }
-
-    this.log.debug({ blockNumber: blockNum }, 'next block');
-
-    try {
-      register.setCurrentBlock(BigInt(blockNum));
-
-      const initialSources = this.getCurrentSources(blockNum);
-      const parentHash = await this.getBlockHash(blockNum - 1);
-      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum, parentHash);
-      const sources = this.getCurrentSources(nextBlockNumber);
-
-      if (initialSources.length !== sources.length) {
-        this.preloadedBlocks = [];
-      }
-
-      return this.next(nextBlockNumber);
-    } catch (err) {
-      if (err instanceof BlockNotFoundError) {
-        if (this.config.optimistic_indexing) {
-          try {
-            await this.indexer.getProvider().processPool(blockNum);
-          } catch (err) {
-            this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
-          }
-        }
-      } else if (err instanceof ReorgDetectedError) {
-        const nextBlockNumber = await this.handleReorg(blockNum);
-        return this.next(nextBlockNumber);
-      } else {
-        this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
-      }
-
-      if (checkpointBlock && this.cpBlocksCache) {
-        this.cpBlocksCache.unshift(checkpointBlock);
-      }
-
-      if (preloadedBlock && this.preloadedBlocks) {
-        this.preloadedBlocks.unshift(preloadedBlock);
-      }
-
-      await sleep(this.opts?.fetchInterval || DEFAULT_FETCH_INTERVAL);
-      return this.next(blockNum);
-    }
-  }
-
-  private async handleReorg(blockNumber: number) {
-    this.log.info({ blockNumber }, 'handling reorg');
-
-    let current = blockNumber - 1;
-    let lastGoodBlock: null | number = null;
-    while (lastGoodBlock === null) {
-      const storedBlockHash = await this.store.getBlockHash(current);
-      const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
-
-      if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
-        lastGoodBlock = current;
-      } else {
-        current -= 1;
-      }
-    }
-
-    const entities = await this.entityController.schemaObjects;
-    const tables = entities.map(entity => getTableName(entity.name.toLowerCase()));
-
-    await this.knex.transaction(async trx => {
-      for (const tableName of tables) {
-        await trx.table(tableName).whereRaw('lower(block_range) > ?', [lastGoodBlock]).delete();
-
-        await trx
-          .table(tableName)
-          .whereRaw('block_range @> int8(??)', [lastGoodBlock])
-          .update({
-            block_range: this.knex.raw('int8range(lower(block_range), NULL)')
-          });
-      }
-    });
-
-    // TODO: when we have full transaction support, we should include this in the transaction
-    await this.store.removeFutureData(lastGoodBlock);
-
-    this.cpBlocksCache = null;
-    this.blockHashCache = null;
-
-    this.log.info({ blockNumber: lastGoodBlock }, 'reorg resolved');
-
-    return lastGoodBlock + 1;
-  }
-
-  private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
-    if (this.cpBlocksCache && this.cpBlocksCache.length !== 0) {
-      return this.cpBlocksCache.shift() || null;
-    }
-
-    const checkpointBlocks = await this.store.getNextCheckpointBlocks(
-      blockNum,
-      this.sourceContracts,
-      15
-    );
-
-    if (checkpointBlocks.length === 0) return null;
-
-    this.cpBlocksCache = checkpointBlocks;
-    return this.cpBlocksCache.shift() || null;
-  }
-
-  private async getBlockHash(blockNumber: number): Promise<string | null> {
-    if (this.blockHashCache && this.blockHashCache.blockNumber === blockNumber) {
-      return this.blockHashCache.hash;
-    }
-
-    return this.store.getBlockHash(blockNumber);
+    container.seedCheckpoints(checkpointBlocks);
   }
 
   private get store(): CheckpointsStore {
@@ -503,110 +212,5 @@ export default class Checkpoint {
 
     this.pgPool = createPgPool(this.dbConnection);
     return this.pgPool;
-  }
-
-  private validateConfig() {
-    const sources = this.config.sources ?? [];
-    const templates = Object.values(this.config.templates ?? {});
-
-    const usedAbis = [
-      ...sources.map(source => source.abi),
-      ...templates.map(template => template.abi)
-    ].filter(abi => abi) as string[];
-    const usedWriters = [
-      ...sources.flatMap(source => source.events),
-      ...templates.flatMap(template => template.events)
-    ];
-
-    const missingAbis = usedAbis.filter(abi => !this.opts?.abis?.[abi]);
-    const missingWriters = usedWriters.filter(
-      writer => !this.indexer.getHandlers().includes(writer.fn)
-    );
-
-    if (missingAbis.length > 0) {
-      throw new Error(
-        `Following ABIs are used (${missingAbis.join(', ')}), but they are missing in opts.abis`
-      );
-    }
-
-    if (missingWriters.length > 0) {
-      throw new Error(
-        `Following writers are used (${missingWriters
-          .map(writer => writer.fn)
-          .join(', ')}), but they are not defined`
-      );
-    }
-  }
-
-  private async validateStore() {
-    const networkIdentifier = await this.indexer.getProvider().getNetworkIdentifier();
-    const configChecksum = getConfigChecksum(this.config);
-
-    const storedNetworkIdentifier = await this.store.getMetadata(MetadataId.NetworkIdentifier);
-    const storedStartBlock = await this.store.getMetadataNumber(MetadataId.StartBlock);
-    const storedConfigChecksum = await this.store.getMetadata(MetadataId.ConfigChecksum);
-    const storedSchemaVersion = await this.store.getMetadataNumber(MetadataId.SchemaVersion);
-    const hasNetworkChanged =
-      storedNetworkIdentifier && storedNetworkIdentifier !== networkIdentifier;
-    const hasStartBlockChanged =
-      storedStartBlock && storedStartBlock !== this.getConfigStartBlock();
-    const hasConfigChanged = storedConfigChecksum && storedConfigChecksum !== configChecksum;
-    const hasSchemaChanged = storedSchemaVersion !== SCHEMA_VERSION;
-
-    if (
-      (hasNetworkChanged || hasStartBlockChanged || hasConfigChanged || hasSchemaChanged) &&
-      this.opts?.resetOnConfigChange
-    ) {
-      await this.resetMetadata();
-      await this.reset();
-
-      await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
-      await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
-      await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
-    } else if (hasNetworkChanged) {
-      this.log.error(
-        `network identifier changed from ${storedNetworkIdentifier} to ${networkIdentifier}.
-        You probably should reset the database by calling .reset() and resetMetadata().
-          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
-      );
-
-      throw new Error('network identifier changed');
-    } else if (hasStartBlockChanged) {
-      this.log.error(
-        `start block changed from ${storedStartBlock} to ${this.getConfigStartBlock()}.
-        You probably should reset the database by calling .reset() and resetMetadata().
-        You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
-      );
-
-      throw new Error('start block changed');
-    } else if (hasConfigChanged) {
-      this.log.error(
-        `config checksum changed from ${storedConfigChecksum} to ${configChecksum} to due to a change in the config.
-          You probably should reset the database by calling .reset() and resetMetadata().
-          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
-      );
-
-      throw new Error('config changed');
-    } else if (hasSchemaChanged) {
-      this.log.error(
-        `schema version changed from ${storedSchemaVersion} to ${SCHEMA_VERSION}.
-          You probably should reset the database by calling .reset() and resetMetadata().
-          You can also set resetOnConfigChange to true in Checkpoint options to do this automatically.`
-      );
-
-      throw new Error('schema changed');
-    } else {
-      if (!storedNetworkIdentifier) {
-        await this.store.setMetadata(MetadataId.NetworkIdentifier, networkIdentifier);
-      }
-
-      if (!storedStartBlock) {
-        await this.store.setMetadata(MetadataId.StartBlock, this.getConfigStartBlock());
-      }
-
-      if (!storedConfigChecksum) {
-        await this.store.setMetadata(MetadataId.ConfigChecksum, configChecksum);
-      }
-    }
   }
 }

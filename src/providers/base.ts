@@ -1,4 +1,3 @@
-import Checkpoint from '../checkpoint';
 import { CheckpointRecord } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
 import { CheckpointConfig, ContractSourceConfig } from '../types';
@@ -9,9 +8,13 @@ export type Instance = {
   setBlockHash(blockNum: number, hash: string);
   setLastIndexedBlock(blockNum: number);
   insertCheckpoints(checkpoints: CheckpointRecord[]);
-  getWriterParams(): Promise<{
-    instance: Checkpoint;
-  }>;
+  getWriterHelpers(): {
+    executeTemplate(
+      template: string,
+      config: { contract: string; start: number },
+      persist?: boolean
+    );
+  };
 };
 
 export class BlockNotFoundError extends Error {

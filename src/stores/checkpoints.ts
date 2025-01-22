@@ -4,29 +4,32 @@ import { Logger } from '../utils/logger';
 import { chunk } from '../utils/helpers';
 import { TemplateSource } from '../types';
 
-const Table = {
+export const Table = {
   Blocks: '_blocks',
   Checkpoints: '_checkpoints',
   Metadata: '_metadatas', // using plural names to conform with standards entities,
   TemplateSources: '_template_sources'
 };
 
-const Fields = {
+export const Fields = {
   Blocks: {
+    Indexer: 'indexer',
     Number: 'block_number',
     Hash: 'hash'
   },
   Checkpoints: {
     Id: 'id',
+    Indexer: 'indexer',
     BlockNumber: 'block_number',
     ContractAddress: 'contract_address'
   },
   Metadata: {
     Id: 'id',
+    Indexer: 'indexer',
     Value: 'value'
   },
   TemplateSources: {
-    Id: 'id',
+    Indexer: 'indexer',
     ContractAddress: 'contract_address',
     StartBlock: 'start_block',
     Template: 'template'
@@ -98,29 +101,35 @@ export class CheckpointsStore {
 
     if (!hasBlocksTable) {
       builder = builder.createTable(Table.Blocks, t => {
-        t.bigint(Fields.Blocks.Number).primary();
-        t.string(Fields.Blocks.Hash).notNullable().unique();
+        t.string(Fields.Blocks.Indexer).notNullable();
+        t.bigint(Fields.Blocks.Number);
+        t.string(Fields.Blocks.Hash).notNullable();
+        t.primary([Fields.Blocks.Indexer, Fields.Blocks.Number]);
       });
     }
 
     if (!hasCheckpointsTable) {
       builder = builder.createTable(Table.Checkpoints, t => {
-        t.string(Fields.Checkpoints.Id, CheckpointIdSize).primary();
+        t.string(Fields.Checkpoints.Id, CheckpointIdSize);
+        t.string(Fields.Checkpoints.Indexer).notNullable();
         t.bigint(Fields.Checkpoints.BlockNumber).notNullable().index();
         t.string(Fields.Checkpoints.ContractAddress, 66).notNullable().index();
+        t.primary([Fields.Checkpoints.Id, Fields.Checkpoints.Indexer]);
       });
     }
 
     if (!hasMetadataTable) {
       builder = builder.createTable(Table.Metadata, t => {
-        t.string(Fields.Metadata.Id, 20).primary();
+        t.string(Fields.Metadata.Id, 20);
+        t.string(Fields.Metadata.Indexer).notNullable();
         t.string(Fields.Metadata.Value, 128).notNullable();
+        t.primary([Fields.Metadata.Id, Fields.Metadata.Indexer]);
       });
     }
 
     if (!hasTemplateSourcesTable) {
       builder = builder.createTable(Table.TemplateSources, t => {
-        t.increments(Fields.TemplateSources.Id);
+        t.string(Fields.TemplateSources.Indexer).notNullable();
         t.string(Fields.TemplateSources.ContractAddress, 66);
         t.bigint(Fields.TemplateSources.StartBlock).notNullable();
         t.string(Fields.TemplateSources.Template, 128).notNullable();
@@ -170,14 +179,41 @@ export class CheckpointsStore {
     await this.createStore();
   }
 
-  public async removeBlocks(): Promise<void> {
-    return this.knex(Table.Blocks).del();
+  public async removeFutureData(indexer: string, blockNumber: number): Promise<void> {
+    return this.knex.transaction(async trx => {
+      await trx
+        .table(Table.Metadata)
+        .insert({
+          [Fields.Metadata.Id]: MetadataId.LastIndexedBlock,
+          [Fields.Metadata.Indexer]: indexer,
+          [Fields.Metadata.Value]: blockNumber
+        })
+        .onConflict([Fields.Metadata.Id, Fields.Metadata.Indexer])
+        .merge();
+
+      await trx
+        .table(Table.Checkpoints)
+        .where(Fields.Checkpoints.Indexer, indexer)
+        .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
+        .del();
+
+      await trx.table(Table.Blocks).where(Fields.Blocks.Number, '>', blockNumber).del();
+    });
   }
 
-  public async getBlockHash(blockNumber: number): Promise<string | null> {
+  public async setBlockHash(indexer: string, blockNumber: number, hash: string): Promise<void> {
+    await this.knex.table(Table.Blocks).insert({
+      [Fields.Blocks.Indexer]: indexer,
+      [Fields.Blocks.Number]: blockNumber,
+      [Fields.Blocks.Hash]: hash
+    });
+  }
+
+  public async getBlockHash(indxer: string, blockNumber: number): Promise<string | null> {
     const blocks = await this.knex
       .select(Fields.Blocks.Hash)
       .from(Table.Blocks)
+      .where(Fields.Blocks.Indexer, indxer)
       .where(Fields.Blocks.Number, blockNumber)
       .limit(1);
 
@@ -188,18 +224,28 @@ export class CheckpointsStore {
     return blocks[0][Fields.Blocks.Hash];
   }
 
-  public async setBlockHash(blockNumber: number, hash: string): Promise<void> {
-    await this.knex.table(Table.Blocks).insert({
-      [Fields.Blocks.Number]: blockNumber,
-      [Fields.Blocks.Hash]: hash
-    });
+  public async removeBlocks(indexer: string): Promise<void> {
+    return this.knex(Table.Blocks).where(Fields.Blocks.Indexer, indexer).del();
   }
 
-  public async getMetadata(id: string): Promise<string | null> {
+  public async setMetadata(indexer: string, id: string, value: ToString): Promise<void> {
+    await this.knex
+      .table(Table.Metadata)
+      .insert({
+        [Fields.Metadata.Id]: id,
+        [Fields.Metadata.Indexer]: indexer,
+        [Fields.Metadata.Value]: value
+      })
+      .onConflict([Fields.Metadata.Id, Fields.Metadata.Indexer])
+      .merge();
+  }
+
+  public async getMetadata(indexer: string, id: string): Promise<string | null> {
     const value = await this.knex
       .select(Fields.Metadata.Value)
       .from(Table.Metadata)
       .where(Fields.Metadata.Id, id)
+      .where(Fields.Metadata.Indexer, indexer)
       .limit(1);
 
     if (value.length == 0) {
@@ -209,33 +255,16 @@ export class CheckpointsStore {
     return value[0][Fields.Metadata.Value];
   }
 
-  public async getMetadataNumber(id: string, base = 10): Promise<number | undefined> {
-    const strValue = await this.getMetadata(id);
-    if (!strValue) {
-      return undefined;
-    }
+  public async getMetadataNumber(indexer: string, id: string, base = 10): Promise<number | null> {
+    const strValue = await this.getMetadata(indexer, id);
+    if (strValue === null) return null;
 
     return parseInt(strValue, base);
   }
 
-  public async setMetadata(id: string, value: ToString): Promise<void> {
-    await this.knex
-      .table(Table.Metadata)
-      .insert({
-        [Fields.Metadata.Id]: id,
-        [Fields.Metadata.Value]: value
-      })
-      .onConflict(Fields.Metadata.Id)
-      .merge();
-  }
-
-  public async insertCheckpoints(checkpoints: CheckpointRecord[]): Promise<void> {
+  public async insertCheckpoints(indexer: string, checkpoints: CheckpointRecord[]): Promise<void> {
     const insert = async (items: CheckpointRecord[]) => {
       try {
-        if (items.length === 0) {
-          return;
-        }
-
         await this.knex
           .table(Table.Checkpoints)
           .insert(
@@ -244,17 +273,18 @@ export class CheckpointsStore {
 
               return {
                 [Fields.Checkpoints.Id]: id,
+                [Fields.Checkpoints.Indexer]: indexer,
                 [Fields.Checkpoints.BlockNumber]: checkpoint.blockNumber,
                 [Fields.Checkpoints.ContractAddress]: checkpoint.contractAddress
               };
             })
           )
-          .onConflict(Fields.Checkpoints.Id)
+          .onConflict([Fields.Checkpoints.Id, Fields.Checkpoints.Indexer])
           .ignore();
       } catch (err: any) {
         if (['ER_LOCK_DEADLOCK', '40P01'].includes(err.code)) {
           this.log.debug('deadlock detected, retrying...');
-          return this.insertCheckpoints(items);
+          return this.insertCheckpoints(indexer, items);
         }
 
         throw err;
@@ -262,26 +292,6 @@ export class CheckpointsStore {
     };
 
     await Promise.all(chunk(checkpoints, 1000).map(chunk => insert(chunk)));
-  }
-
-  public async removeFutureData(blockNumber: number): Promise<void> {
-    return this.knex.transaction(async trx => {
-      await trx
-        .table(Table.Metadata)
-        .insert({
-          [Fields.Metadata.Id]: MetadataId.LastIndexedBlock,
-          [Fields.Metadata.Value]: blockNumber
-        })
-        .onConflict(Fields.Metadata.Id)
-        .merge();
-
-      await trx
-        .table(Table.Checkpoints)
-        .where(Fields.Checkpoints.BlockNumber, '>', blockNumber)
-        .del();
-
-      await trx.table(Table.Blocks).where(Fields.Blocks.Number, '>', blockNumber).del();
-    });
   }
 
   /**
@@ -293,6 +303,7 @@ export class CheckpointsStore {
    * can be modified by the limit command.
    */
   public async getNextCheckpointBlocks(
+    indexer: string,
     block: number,
     contracts: string[],
     limit = 15
@@ -300,6 +311,7 @@ export class CheckpointsStore {
     const result = await this.knex
       .distinct(Fields.Checkpoints.BlockNumber)
       .from(Table.Checkpoints)
+      .where(Fields.Checkpoints.Indexer, indexer)
       .where(Fields.Checkpoints.BlockNumber, '>=', block)
       .whereIn(Fields.Checkpoints.ContractAddress, contracts)
       .orderBy(Fields.Checkpoints.BlockNumber, 'asc')
@@ -311,25 +323,28 @@ export class CheckpointsStore {
   }
 
   public async insertTemplateSource(
+    indexer: string,
     contractAddress: string,
     startBlock: number,
     template: string
   ): Promise<void> {
     return this.knex.table(Table.TemplateSources).insert({
+      [Fields.TemplateSources.Indexer]: indexer,
       [Fields.TemplateSources.ContractAddress]: contractAddress,
       [Fields.TemplateSources.StartBlock]: startBlock,
       [Fields.TemplateSources.Template]: template
     });
   }
 
-  public async getTemplateSources(): Promise<TemplateSource[]> {
+  public async getTemplateSources(indexer: string): Promise<TemplateSource[]> {
     const data = await this.knex
       .select(
         Fields.TemplateSources.ContractAddress,
         Fields.TemplateSources.StartBlock,
         Fields.TemplateSources.Template
       )
-      .from(Table.TemplateSources);
+      .from(Table.TemplateSources)
+      .where(Fields.TemplateSources.Indexer, indexer);
 
     return data.map(row => ({
       contractAddress: row[Fields.TemplateSources.ContractAddress],

@@ -2,14 +2,14 @@ import { Knex } from 'knex';
 
 function createRegister() {
   let knexInstance: Knex | null = null;
-  let currentBlock = 0n;
+  const currentBlocks = new Map<string, bigint>();
 
   return {
-    getCurrentBlock() {
-      return currentBlock;
+    getCurrentBlock(indexerName: string) {
+      return currentBlocks.get(indexerName) || 0n;
     },
-    setCurrentBlock(block: bigint) {
-      currentBlock = block;
+    setCurrentBlock(indexerName: string, block: bigint) {
+      currentBlocks.set(indexerName, block);
     },
     getKnex() {
       if (!knexInstance) {
