@@ -1,19 +1,18 @@
 import pino, { Logger as PinoLogger, LoggerOptions } from 'pino';
 
-// LogLevel to control what levels of logs are
-// required.
+/** The minimum level to log. */
 export enum LogLevel {
-  // silent to disable all logging
+  /** Disable all logs.  */
   Silent = 'silent',
-  // fatal to log unrecoverable errors
+  /** Log unrecoverable errors. */
   Fatal = 'fatal',
-  // error to log general errors
+  /** Log general errors. */
   Error = 'error',
-  // warn to log alerts or notices
+  /** Log alerts or notices */
   Warn = 'warn',
-  // info to log useful information
+  /** Log useful information. */
   Info = 'info',
-  // debug to log debug and trace information
+  /** Log debug and trace information. */
   Debug = 'debug'
 }
 

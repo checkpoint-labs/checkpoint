@@ -31,6 +31,7 @@ export const checkpointConfigSchema = z.object({
 });
 
 export const overridesConfigSchema = z.object({
+  /** Decimal types to define for use in your schema. */
   decimal_types: z
     .record(
       z.object({
