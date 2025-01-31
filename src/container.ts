@@ -330,37 +330,13 @@ export class Container implements Instance {
     return lastGoodBlock + 1;
   }
 
-  /**
-   * Reset will clear the last synced block informations
-   * and force Checkpoint to start indexing from the start
-   * block.
-   *
-   * This will also clear all indexed GraphQL entity records.
-   *
-   * This should be called when there has been a change to the GraphQL schema
-   * or a change to the writer functions logic, so indexing will re-run from
-   * the starting block. Also, it should be called the first time Checkpoint
-   * is being initialized.
-   *
-   */
   public async reset() {
-    await this.store.createStore();
     await this.store.setMetadata(this.indexerName, MetadataId.LastIndexedBlock, 0);
     await this.store.setMetadata(this.indexerName, MetadataId.SchemaVersion, SCHEMA_VERSION);
     await this.store.removeBlocks(this.indexerName);
-
-    await this.entityController.createEntityStores(this.knex);
   }
 
-  /**
-   * Resets Checkpoint's internal tables (including checkpoints).
-   *
-   * Calling this function will cause next run of checkpoint to start syncing
-   * from the start, block-by-block, until new checkpoints are found.
-   *
-   */
   public async resetMetadata() {
-    await this.store.resetStore();
     await this.store.setMetadata(this.indexerName, MetadataId.SchemaVersion, SCHEMA_VERSION);
   }
 
