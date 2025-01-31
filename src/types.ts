@@ -15,18 +15,21 @@ export type TemplateSource = {
 };
 
 export interface CheckpointOptions {
-  // Setting to true will trigger reset of database on config changes.
+  /** Setting this to true will trigger reset of database on config changes. */
   resetOnConfigChange?: boolean;
-  // Set the log output levels for checkpoint. Defaults to Error.
-  // Note, this does not affect the log outputs in writers.
+  /**
+   * Set the log output levels for checkpoint. Defaults to Error.
+   * Note, this does not affect the log outputs in writers.
+   */
   logLevel?: LogLevel;
-  // optionally format logs to pretty output.
-  // Not recommended for production.
+  /** Format logs to pretty output. Not recommended for production. */
   prettifyLogs?: boolean;
-  // Optional database connection string. For now only accepts PostgreSQL and MySQL/MariaDB
-  // connection string. If no provided will default to looking up a value in
-  // the DATABASE_URL environment.
+  /**
+   * Optional database connection string. Must be PostgreSQL connection string.
+   * If not provided connection strinng will be read from DATABASE_URL environment variable.
+   */
   dbConnection?: string;
+  /** Overrides for database types. */
   overridesConfig?: OverridesConfig;
 }
 
