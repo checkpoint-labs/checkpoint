@@ -152,10 +152,13 @@ export default class Checkpoint {
    */
   public async reset() {
     this.log.debug('reset');
+    await this.store.createStore();
 
     for (const container of this.containers.values()) {
       await container.reset();
     }
+
+    await this.entityController.createEntityStores(this.knex);
   }
 
   /**
@@ -167,6 +170,8 @@ export default class Checkpoint {
    */
   public async resetMetadata() {
     this.log.debug('reset metadata');
+
+    await this.store.resetStore();
 
     for (const container of this.containers.values()) {
       await container.resetMetadata();
