@@ -26,6 +26,7 @@ export default class Checkpoint {
   private knex: Knex;
   private pgPool?: PgPool;
   private checkpointsStore?: CheckpointsStore;
+  private opts?: CheckpointOptions;
 
   constructor(schema: string, opts?: CheckpointOptions) {
     this.schema = extendSchema(schema);
@@ -56,12 +57,7 @@ export default class Checkpoint {
     register.setKnex(this.knex);
   }
 
-  public addIndexer(
-    name: string,
-    config: CheckpointConfig,
-    indexer: BaseIndexer,
-    opts?: CheckpointOptions
-  ) {
+  public addIndexer(name: string, config: CheckpointConfig, indexer: BaseIndexer) {
     const validationResult = checkpointConfigSchema.safeParse(config);
     if (validationResult.success === false) {
       throw new Error(`Checkpoint config is invalid: ${validationResult.error.message}`);
@@ -76,7 +72,7 @@ export default class Checkpoint {
       config,
       indexer,
       this.schema,
-      opts
+      this.opts
     );
 
     container.validateConfig();
