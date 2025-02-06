@@ -20,7 +20,7 @@ create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!, indexer: String, block: Int): Vote
-  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote]
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote!]!
 }
 
 type Vote {
@@ -66,11 +66,11 @@ input Vote_filter {
 exports[`GqlEntityController generateSampleQuery should generate query schema 1`] = `
 "type Query {
   vote(id: Int!, indexer: String, block: Int): Vote
-  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote]
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote!]!
   _metadata(id: ID!, indexer: String, block: Int): _Metadata
-  _metadatas(first: Int, skip: Int, orderBy: _Metadata_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Metadata_filter): [_Metadata]
+  _metadatas(first: Int, skip: Int, orderBy: _Metadata_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Metadata_filter): [_Metadata!]!
   _checkpoint(id: ID!, indexer: String, block: Int): _Checkpoint
-  _checkpoints(first: Int, skip: Int, orderBy: _Checkpoint_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Checkpoint_filter): [_Checkpoint]
+  _checkpoints(first: Int, skip: Int, orderBy: _Checkpoint_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Checkpoint_filter): [_Checkpoint!]!
 }
 
 type Vote {

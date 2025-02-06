@@ -455,7 +455,7 @@ export class GqlEntityController {
     });
 
     return {
-      type: new GraphQLList(type),
+      type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(type))),
       args: {
         first: {
           type: GraphQLInt
