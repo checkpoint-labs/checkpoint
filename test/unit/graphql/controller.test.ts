@@ -124,5 +124,19 @@ type Venue {
       expect(controller.generateSampleQuery()).not.toBeUndefined();
       expect(controller.generateSampleQuery()).toMatchSnapshot();
     });
+
+    it('should generate query schema', () => {
+      const schema = `
+        type Vote {
+          id: Int!
+          name: String
+          authenticators: [String]
+        }`;
+
+      const controller = new GqlEntityController(schema);
+      const generatedSchema = controller.generateSchema();
+
+      expect(printSchema(generatedSchema)).toMatchSnapshot();
+    });
   });
 });

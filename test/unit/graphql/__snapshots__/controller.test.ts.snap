@@ -20,7 +20,7 @@ create index \`votes_big_decimal_index\` on \`votes\` (\`big_decimal\`)"
 exports[`GqlEntityController generateQueryFields should work 1`] = `
 "type Query {
   vote(id: Int!, indexer: String, block: Int): Vote
-  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote]
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote!]!
 }
 
 type Vote {
@@ -60,6 +60,140 @@ input Vote_filter {
   authenticators_not: [String]
   authenticators_contains: [String]
   authenticators_not_contains: [String]
+}"
+`;
+
+exports[`GqlEntityController generateSampleQuery should generate query schema 1`] = `
+"type Query {
+  vote(id: Int!, indexer: String, block: Int): Vote
+  votes(first: Int, skip: Int, orderBy: Vote_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: Vote_filter): [Vote!]!
+  _metadata(id: ID!, indexer: String, block: Int): _Metadata
+  _metadatas(first: Int, skip: Int, orderBy: _Metadata_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Metadata_filter): [_Metadata!]!
+  _checkpoint(id: ID!, indexer: String, block: Int): _Checkpoint
+  _checkpoints(first: Int, skip: Int, orderBy: _Checkpoint_orderBy, orderDirection: OrderDirection, indexer: String, block: Int, where: _Checkpoint_filter): [_Checkpoint!]!
+}
+
+type Vote {
+  id: Int!
+  name: String
+  authenticators: [String]
+}
+
+enum Vote_orderBy {
+  id
+  name
+}
+
+enum OrderDirection {
+  asc
+  desc
+}
+
+input Vote_filter {
+  id_gt: Int
+  id_gte: Int
+  id_lt: Int
+  id_lte: Int
+  id: Int
+  id_not: Int
+  id_in: [Int]
+  id_not_in: [Int]
+  name_contains: String
+  name_not_contains: String
+  name_contains_nocase: String
+  name_not_contains_nocase: String
+  name: String
+  name_not: String
+  name_in: [String]
+  name_not_in: [String]
+  authenticators: [String]
+  authenticators_not: [String]
+  authenticators_contains: [String]
+  authenticators_not_contains: [String]
+}
+
+"""Core metadata values used internally by Checkpoint"""
+type _Metadata {
+  """example: last_indexed_block"""
+  id: ID!
+  indexer: String!
+  value: String
+}
+
+enum _Metadata_orderBy {
+  id
+  indexer
+  value
+}
+
+input _Metadata_filter {
+  id: ID
+  id_not: ID
+  id_in: [ID]
+  id_not_in: [ID]
+  indexer_contains: String
+  indexer_not_contains: String
+  indexer_contains_nocase: String
+  indexer_not_contains_nocase: String
+  indexer: String
+  indexer_not: String
+  indexer_in: [String]
+  indexer_not_in: [String]
+  value_contains: String
+  value_not_contains: String
+  value_contains_nocase: String
+  value_not_contains_nocase: String
+  value: String
+  value_not: String
+  value_in: [String]
+  value_not_in: [String]
+}
+
+"""Contract and Block where its event is found."""
+type _Checkpoint {
+  """id computed as last 5 bytes of sha256(contract+block)"""
+  id: ID!
+  indexer: String!
+  block_number: Int!
+  contract_address: String!
+}
+
+enum _Checkpoint_orderBy {
+  id
+  indexer
+  block_number
+  contract_address
+}
+
+input _Checkpoint_filter {
+  id: ID
+  id_not: ID
+  id_in: [ID]
+  id_not_in: [ID]
+  indexer_contains: String
+  indexer_not_contains: String
+  indexer_contains_nocase: String
+  indexer_not_contains_nocase: String
+  indexer: String
+  indexer_not: String
+  indexer_in: [String]
+  indexer_not_in: [String]
+  block_number_gt: Int
+  block_number_gte: Int
+  block_number_lt: Int
+  block_number_lte: Int
+  block_number: Int
+  block_number_not: Int
+  block_number_in: [Int]
+  block_number_not_in: [Int]
+  contract_address_contains: String
+  contract_address_not_contains: String
+  contract_address_contains_nocase: String
+  contract_address_not_contains_nocase: String
+  contract_address: String
+  contract_address_not: String
+  contract_address_in: [String]
+  contract_address_not_in: [String]
 }"
 `;
 

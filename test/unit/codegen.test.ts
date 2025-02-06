@@ -1,5 +1,6 @@
 import { GraphQLObjectType, buildSchema } from 'graphql';
 import { getInitialValue, getBaseType, getJSType, codegen, getTypeInfo } from '../../src/codegen';
+import { GqlEntityController } from '../../src/graphql/controller';
 import { extendSchema } from '../../src/utils/graphql';
 
 const SCHEMA_SOURCE = `
@@ -172,12 +173,14 @@ describe('getJSType', () => {
 
 describe('codegen', () => {
   const overridesConfig = {};
+  const extendedSchema = extendSchema(SCHEMA_SOURCE);
+  const controller = new GqlEntityController(extendedSchema);
 
   it('should generate typescript code', () => {
-    expect(codegen(SCHEMA_SOURCE, overridesConfig, 'typescript')).toMatchSnapshot();
+    expect(codegen(controller, overridesConfig, 'typescript')).toMatchSnapshot();
   });
 
   it('should generate javascript code', () => {
-    expect(codegen(SCHEMA_SOURCE, overridesConfig, 'javascript')).toMatchSnapshot();
+    expect(codegen(controller, overridesConfig, 'javascript')).toMatchSnapshot();
   });
 });
