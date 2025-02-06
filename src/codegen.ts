@@ -13,7 +13,7 @@ import {
 } from 'graphql';
 import pluralize from 'pluralize';
 import { GqlEntityController } from './graphql/controller';
-import { extendSchema, getDerivedFromDirective } from './utils/graphql';
+import { getDerivedFromDirective } from './utils/graphql';
 import { OverridesConfig } from './types';
 
 type TypeInfo = {
@@ -113,13 +113,11 @@ export const getJSType = (
 };
 
 export const codegen = (
-  schema: string,
+  controller: GqlEntityController,
   config: OverridesConfig,
   format: 'typescript' | 'javascript'
 ) => {
   const decimalTypes = config.decimal_types || DEFAULT_DECIMAL_TYPES;
-  const extendedSchema = extendSchema(schema);
-  const controller = new GqlEntityController(extendedSchema, config);
 
   const preamble = `import { Model } from '@snapshot-labs/checkpoint';\n\n`;
 

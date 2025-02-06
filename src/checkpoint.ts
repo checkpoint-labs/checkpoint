@@ -1,8 +1,6 @@
-import { GraphQLObjectType, GraphQLSchema } from 'graphql';
-import { addResolversToSchema } from '@graphql-tools/schema';
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
-import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
+import getGraphQL from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { CheckpointsStore } from './stores/checkpoints';
 import { BaseIndexer } from './providers';
@@ -89,24 +87,7 @@ export default class Checkpoint {
   }
 
   public getSchema() {
-    const entityQueryFields = this.entityController.generateQueryFields();
-    const coreQueryFields = this.entityController.generateQueryFields([
-      MetadataGraphQLObject,
-      CheckpointsGraphQLObject
-    ]);
-
-    const query = new GraphQLObjectType({
-      name: 'Query',
-      fields: {
-        ...entityQueryFields,
-        ...coreQueryFields
-      }
-    });
-
-    return addResolversToSchema({
-      schema: new GraphQLSchema({ query }),
-      resolvers: this.entityController.generateEntityResolvers(entityQueryFields)
-    });
+    return this.entityController.generateSchema({ addResolvers: true });
   }
 
   /**

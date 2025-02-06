@@ -7,6 +7,9 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import { codegen } from '../codegen';
 import { OverridesConfig } from '../types';
+import { extendSchema } from '../utils/graphql';
+import { GqlEntityController } from '../graphql/controller';
+import { printSchema } from 'graphql';
 
 const DEFAULT_CONFIG_PATH = 'src/overrides.json';
 const DEFAULT_SCHEMA_PATH = 'src/schema.gql';
@@ -17,28 +20,38 @@ async function generate(schemaFile: string, overridesConfigFile: string, format:
     throw new Error('Invalid output format');
   }
 
-  console.log('Generating models from schema:', schemaFile);
-
   const cwd = process.cwd();
   const schemaFilePath = path.join(cwd, schemaFile);
   const overridesConfigFilePath = path.join(cwd, overridesConfigFile);
 
-  const schema = await fs.readFile(schemaFilePath, 'utf8');
+  console.log('Generating models from schema:', schemaFile);
 
   let config: OverridesConfig = {};
   try {
     config = await import(overridesConfigFilePath);
   } catch (err) {}
 
-  const generatedModels = codegen(schema, config, format);
+  let schema = await fs.readFile(schemaFilePath, 'utf8');
+  schema = extendSchema(schema);
+
+  const controller = new GqlEntityController(schema, config);
+
+  const generatedModels = codegen(controller, config, format);
 
   const outputFile = format === 'typescript' ? 'models.ts' : 'models.js';
-  const outputPath = path.join(OUTPUT_DIRECTORY, outputFile);
+  const modelsOutputPath = path.join(OUTPUT_DIRECTORY, outputFile);
 
   await fs.mkdir(path.join(cwd, OUTPUT_DIRECTORY), { recursive: true });
-  await fs.writeFile(path.join(cwd, outputPath), generatedModels);
+  await fs.writeFile(path.join(cwd, modelsOutputPath), generatedModels);
 
-  console.log('Models generated to', outputPath);
+  console.log('Models generated to', modelsOutputPath);
+
+  console.log('Generating query schema');
+  const querySchema = controller.generateSchema();
+  const schemaOutputPath = path.join(OUTPUT_DIRECTORY, 'schema.gql');
+  await fs.writeFile(path.join(cwd, schemaOutputPath), printSchema(querySchema));
+
+  console.log('Schema generated to', schemaOutputPath);
 }
 
 yargs(hideBin(process.argv))

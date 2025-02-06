@@ -33,6 +33,8 @@ import {
 } from '../utils/graphql';
 import { OverridesConfig } from '../types';
 import { querySingle, queryMulti, getNestedResolver } from './resolvers';
+import { CheckpointsGraphQLObject, MetadataGraphQLObject } from '.';
+import { addResolversToSchema } from '@graphql-tools/schema';
 
 /**
  * Type for single and multiple query resolvers
@@ -561,5 +563,32 @@ export class GqlEntityController {
     }
 
     throw new Error(`sql type for ${type} is not supported`);
+  }
+
+  generateSchema(opts?: { addResolvers?: boolean }) {
+    const entityQueryFields = this.generateQueryFields();
+    const coreQueryFields = this.generateQueryFields([
+      MetadataGraphQLObject,
+      CheckpointsGraphQLObject
+    ]);
+
+    const query = new GraphQLObjectType({
+      name: 'Query',
+      fields: {
+        ...entityQueryFields,
+        ...coreQueryFields
+      }
+    });
+
+    const schema = new GraphQLSchema({ query });
+
+    if (opts?.addResolvers) {
+      return addResolversToSchema({
+        schema,
+        resolvers: this.generateEntityResolvers(entityQueryFields)
+      });
+    }
+
+    return schema;
   }
 }
