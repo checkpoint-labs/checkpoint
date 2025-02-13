@@ -163,8 +163,12 @@ export class GqlEntityController {
       entities[obj.name] = this.getTypeFields(obj).reduce((resolvers, field) => {
         const nonNullType = getNonNullType(field.type);
 
-        if (isListType(nonNullType) && nonNullType.ofType instanceof GraphQLObjectType) {
-          resolvers[field.name] = getNestedResolver(multiEntityQueryName(nonNullType.ofType));
+        if (isListType(nonNullType)) {
+          const itemType = getNonNullType(nonNullType.ofType);
+
+          if (itemType instanceof GraphQLObjectType) {
+            resolvers[field.name] = getNestedResolver(multiEntityQueryName(itemType));
+          }
         }
 
         if (nonNullType instanceof GraphQLObjectType) {
