@@ -67,8 +67,9 @@ export async function queryMulti(
 ): Promise<Result[]> {
   const { log, knex } = context;
 
-  if (!isListType(info.returnType)) throw new Error('unexpected return type');
-  const returnType = info.returnType.ofType as GraphQLObjectType;
+  const nonNullType = getNonNullType(info.returnType);
+  if (!isListType(nonNullType)) throw new Error('unexpected return type');
+  const returnType = getNonNullType(nonNullType.ofType) as GraphQLObjectType;
   const jsonFields = getJsonFields(returnType);
 
   const tableName = getTableName(returnType.name.toLowerCase());
@@ -299,8 +300,10 @@ export const getNestedResolver =
       indexer: parent._args?.indexer
     };
 
-    const returnType = getNonNullType(info.returnType) as GraphQLList<GraphQLObjectType>;
-    const jsonFields = getJsonFields(returnType.ofType);
+    const returnType = getNonNullType(info.returnType) as
+      | GraphQLList<GraphQLObjectType>
+      | GraphQLList<GraphQLNonNull<GraphQLObjectType>>;
+    const jsonFields = getJsonFields(getNonNullType(returnType.ofType) as GraphQLObjectType);
 
     const parentType = getNonNullType(info.parentType) as GraphQLObjectType;
     const field = parentType.getFields()[info.fieldName];
