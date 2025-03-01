@@ -209,11 +209,11 @@ export class CheckpointsStore {
     });
   }
 
-  public async getBlockHash(indxer: string, blockNumber: number): Promise<string | null> {
+  public async getBlockHash(indexer: string, blockNumber: number): Promise<string | null> {
     const blocks = await this.knex
       .select(Fields.Blocks.Hash)
       .from(Table.Blocks)
-      .where(Fields.Blocks.Indexer, indxer)
+      .where(Fields.Blocks.Indexer, indexer)
       .where(Fields.Blocks.Number, blockNumber)
       .limit(1);
 

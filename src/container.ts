@@ -308,11 +308,16 @@ export class Container implements Instance {
 
     await this.knex.transaction(async trx => {
       for (const tableName of tables) {
-        await trx.table(tableName).whereRaw('lower(block_range) > ?', [lastGoodBlock]).delete();
+        await trx
+          .table(tableName)
+          .where('_indexer', this.indexerName)
+          .andWhereRaw('lower(block_range) > ?', [lastGoodBlock])
+          .delete();
 
         await trx
           .table(tableName)
-          .whereRaw('block_range @> int8(??)', [lastGoodBlock])
+          .where('_indexer', this.indexerName)
+          .andWhereRaw('block_range @> int8(??)', [lastGoodBlock])
           .update({
             block_range: this.knex.raw('int8range(lower(block_range), NULL)')
           });
