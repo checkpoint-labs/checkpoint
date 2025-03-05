@@ -293,7 +293,7 @@ export const getNestedResolver =
     context: ResolverContext,
     info: GraphQLResolveInfo
   ): Promise<Result[]> => {
-    const { knex, getLoader } = context;
+    const { getLoader } = context;
 
     const queryFilter = {
       block: parent._args?.block,
@@ -316,10 +316,14 @@ export const getNestedResolver =
 
     let result: Record<string, any>[] = [];
     if (!derivedFromDirective) {
-      const tableName = getTableName(columnName);
-      const query = knex.select('*').from(tableName).whereIn('id', parent[info.fieldName]);
+      const loaderResult = await getLoader(columnName, 'id', queryFilter).loadMany(
+        parent[info.fieldName]
+      );
 
-      result = await applyQueryFilter(query, tableName, queryFilter);
+      // NOTE: loader returns array of arrays when used with loadMany, because in some cases,
+      // for example when fetching derived entities we expect multiple results for a single id
+      // this is why we need to flatten it. In the future it would be nice to have clearer API
+      result = loaderResult.flat();
     } else {
       const fieldArgument = derivedFromDirective.arguments?.find(arg => arg.name.value === 'field');
       if (!fieldArgument || fieldArgument.value.kind !== 'StringValue') {
