@@ -157,10 +157,8 @@ export class EvmProvider extends BaseProvider {
 
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
-      const contract = getAddress(source.contract);
-
       for (const [eventIndex, log] of logs.entries()) {
-        if (contract === getAddress(log.address)) {
+        if (this.compareAddress(source.contract, log.address)) {
           for (const sourceEvent of source.events) {
             const targetTopic = this.getEventHash(sourceEvent.name);
 
@@ -280,5 +278,9 @@ export class EvmProvider extends BaseProvider {
     }
 
     return this.sourceHashes.get(eventName) as string;
+  }
+
+  compareAddress(a: string, b: string) {
+    return a.toLowerCase() === b.toLowerCase();
   }
 }
