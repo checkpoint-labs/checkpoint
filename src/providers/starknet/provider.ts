@@ -69,24 +69,24 @@ export class StarknetProvider extends BaseProvider {
         this.provider.getBlockWithTxs(blockNum),
         this.getEvents(blockNum)
       ]);
-
-      if (parentHash && block.parent_hash !== parentHash) {
-        this.log.error({ blockNumber: blockNum }, 'reorg detected');
-        throw new ReorgDetectedError();
-      }
-
-      if (!isFullBlock(block) || block.block_number !== blockNum) {
-        this.log.error({ blockNumber: blockNum }, 'invalid block');
-        throw new Error('invalid block');
-      }
     } catch (e) {
-      if ((e as Error).message.includes('Block not found') || e instanceof BlockNotFoundError) {
+      if ((e as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
         throw new BlockNotFoundError();
       }
 
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
+    }
+
+    if (parentHash && block.parent_hash !== parentHash) {
+      this.log.error({ blockNumber: blockNum }, 'reorg detected');
+      throw new ReorgDetectedError();
+    }
+
+    if (!isFullBlock(block) || block.block_number !== blockNum) {
+      this.log.error({ blockNumber: blockNum }, 'invalid block');
+      throw new Error('invalid block');
     }
 
     await this.handleBlock(block, blockEvents);

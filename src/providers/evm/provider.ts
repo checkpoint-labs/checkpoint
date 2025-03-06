@@ -61,19 +61,19 @@ export class EvmProvider extends BaseProvider {
         this.provider.getBlockWithTransactions(blockNum),
         this.getEvents(blockNum)
       ]);
-
-      if (block === null) {
-        this.log.info({ blockNumber: blockNum }, 'block not found');
-        throw new BlockNotFoundError();
-      }
-
-      if (parentHash && block.parentHash !== parentHash) {
-        this.log.error({ blockNumber: blockNum }, 'reorg detected');
-        throw new ReorgDetectedError();
-      }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
+    }
+
+    if (block === null) {
+      this.log.info({ blockNumber: blockNum }, 'block not found');
+      throw new BlockNotFoundError();
+    }
+
+    if (parentHash && block.parentHash !== parentHash) {
+      this.log.error({ blockNumber: blockNum }, 'reorg detected');
+      throw new ReorgDetectedError();
     }
 
     await this.handleBlock(block, eventsMap);
