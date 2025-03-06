@@ -13,11 +13,13 @@ type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
 const MAX_BLOCKS_PER_REQUEST = 10000;
+
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
   private readonly writers: Record<string, Writer>;
   private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
+  private sourceHashes = new Map<string, string>();
 
   constructor({
     instance,
@@ -123,7 +125,7 @@ export class EvmProvider extends BaseProvider {
 
     if (this.instance.config.global_events) {
       const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
-        handlers[keccak256(toUtf8Bytes(event.name))] = {
+        handlers[this.getEventHash(event.name)] = {
           name: event.name,
           fn: event.fn
         };
@@ -160,7 +162,7 @@ export class EvmProvider extends BaseProvider {
       for (const [eventIndex, log] of logs.entries()) {
         if (contract === getAddress(log.address)) {
           for (const sourceEvent of source.events) {
-            const targetTopic = keccak256(toUtf8Bytes(sourceEvent.name));
+            const targetTopic = this.getEventHash(sourceEvent.name);
 
             if (targetTopic === log.topics[0]) {
               this.log.info(
@@ -270,5 +272,13 @@ export class EvmProvider extends BaseProvider {
     }
 
     return events;
+  }
+
+  getEventHash(eventName: string) {
+    if (!this.sourceHashes.has(eventName)) {
+      this.sourceHashes.set(eventName, keccak256(toUtf8Bytes(eventName)));
+    }
+
+    return this.sourceHashes.get(eventName) as string;
   }
 }
