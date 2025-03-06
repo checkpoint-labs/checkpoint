@@ -22,6 +22,7 @@ export class StarknetProvider extends BaseProvider {
   private seenPoolTransactions = new Set();
   private processedTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
+  private sourceHashes = new Map<string, string>();
 
   constructor({
     instance,
@@ -201,7 +202,7 @@ export class StarknetProvider extends BaseProvider {
 
     if (this.instance.config.global_events) {
       const globalEventHandlers = this.instance.config.global_events.reduce((handlers, event) => {
-        handlers[`0x${hash.starknetKeccak(event.name).toString(16)}`] = {
+        handlers[this.getEventHash(event.name)] = {
           name: event.name,
           fn: event.fn
         };
@@ -262,7 +263,7 @@ export class StarknetProvider extends BaseProvider {
       for (const [eventIndex, event] of events.entries()) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
-            if (`0x${hash.starknetKeccak(sourceEvent.name).toString(16)}` === event.keys[0]) {
+            if (this.getEventHash(sourceEvent.name) === event.keys[0]) {
               foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
@@ -368,7 +369,7 @@ export class StarknetProvider extends BaseProvider {
         from_block: { block_number: fromBlock },
         to_block: { block_number: toBlock },
         address: address,
-        keys: [eventNames.map(name => `0x${hash.starknetKeccak(name).toString(16)}`)],
+        keys: [eventNames.map(name => this.getEventHash(name))],
         chunk_size: 1000,
         continuation_token: continuationToken
       });
@@ -398,5 +399,13 @@ export class StarknetProvider extends BaseProvider {
     }
 
     return events;
+  }
+
+  getEventHash(eventName: string) {
+    if (!this.sourceHashes.has(eventName)) {
+      this.sourceHashes.set(eventName, `0x${hash.starknetKeccak(eventName).toString(16)}`);
+    }
+
+    return this.sourceHashes.get(eventName) as string;
   }
 }
