@@ -16,6 +16,9 @@ const BLOCK_RELOAD_MIN_RANGE = 10;
 const BLOCK_PRELOAD_STEP = 100;
 const BLOCK_PRELOAD_TARGET = 10;
 const BLOCK_PRELOAD_OFFSET = 50;
+
+const CHECK_LATEST_BLOCK_INTERVAL = 50;
+
 const DEFAULT_FETCH_INTERVAL = 2000;
 
 export class Container implements Instance {
@@ -205,6 +208,7 @@ export class Container implements Instance {
       const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
       let checkpoints: CheckpointRecord[];
       try {
+        this.log.info({ start: currentBlock, end: endBlock }, 'preloading blocks');
         checkpoints = await this.indexer.getProvider().getCheckpointsRange(currentBlock, endBlock);
       } catch (e) {
         this.log.error(
@@ -240,6 +244,23 @@ export class Container implements Instance {
       } else if (blockNum <= this.preloadEndBlock) {
         preloadedBlock = await this.preload(blockNum);
         blockNum = preloadedBlock || this.preloadEndBlock + 1;
+      }
+    }
+
+    if (!checkpointBlock && !preloadedBlock) {
+      if (blockNum % CHECK_LATEST_BLOCK_INTERVAL === 0) {
+        const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
+
+        this.log.info({ latestBlock, behind: latestBlock - blockNum }, 'checking latest block');
+
+        if (latestBlock > blockNum + BLOCK_PRELOAD_OFFSET * 2) {
+          this.log.info(
+            { latestBlock, blockNum },
+            `fell behind more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+          );
+
+          this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
+        }
       }
     }
 
