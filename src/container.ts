@@ -256,7 +256,7 @@ export class Container implements Instance {
         if (latestBlock > blockNum + BLOCK_PRELOAD_OFFSET * 2) {
           this.log.info(
             { latestBlock, blockNum },
-            `fell behind more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+            `fell more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
           );
 
           this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
