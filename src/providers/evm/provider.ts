@@ -7,6 +7,7 @@ import { toUtf8Bytes } from '@ethersproject/strings';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { Writer } from './types';
 import { ContractSourceConfig } from '../../types';
+import { sleep } from '../../utils/helpers';
 
 type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactions']>>;
 type Transaction = BlockWithTransactions['transactions'][number];
@@ -242,16 +243,28 @@ export class EvmProvider extends BaseProvider {
         currentFrom = currentTo + 1;
         currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
       } catch (e: any) {
-        if (!e.body) throw e;
+        // Handle Infura response size hint
+        if (e.body) {
+          try {
+            const body = JSON.parse(e.body);
 
-        const body = JSON.parse(e.body);
-        if (body.error.code !== -32005) throw e;
+            if (body.error.code === -32005) {
+              currentFrom = parseInt(body.error.data.from, 16);
+              currentTo = Math.min(
+                parseInt(body.error.data.to, 16),
+                currentFrom + MAX_BLOCKS_PER_REQUEST
+              );
+              continue;
+            }
+          } catch {}
+        }
 
-        currentFrom = parseInt(body.error.data.from, 16);
-        currentTo = Math.min(
-          parseInt(body.error.data.to, 16),
-          currentFrom + MAX_BLOCKS_PER_REQUEST
+        this.log.error(
+          { fromBlock: currentFrom, toBlock: currentTo, address, err: e },
+          'getLogs failed'
         );
+
+        await sleep(5000);
       }
     }
 
