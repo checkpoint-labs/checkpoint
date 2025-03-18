@@ -15,6 +15,7 @@ import {
   Writer
 } from './types';
 import { ContractSourceConfig } from '../../types';
+import { sleep } from '../../utils/helpers';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
@@ -365,18 +366,27 @@ export class StarknetProvider extends BaseProvider {
 
     let continuationToken: string | undefined;
     do {
-      const result = await this.provider.getEvents({
-        from_block: { block_number: fromBlock },
-        to_block: { block_number: toBlock },
-        address: address,
-        keys: [eventNames.map(name => this.getEventHash(name))],
-        chunk_size: 1000,
-        continuation_token: continuationToken
-      });
+      try {
+        const result = await this.provider.getEvents({
+          from_block: { block_number: fromBlock },
+          to_block: { block_number: toBlock },
+          address: address,
+          keys: [eventNames.map(name => this.getEventHash(name))],
+          chunk_size: 1000,
+          continuation_token: continuationToken
+        });
 
-      events = events.concat(result.events);
+        events = events.concat(result.events);
 
-      continuationToken = result.continuation_token;
+        continuationToken = result.continuation_token;
+      } catch (e) {
+        this.log.error(
+          { fromBlock, toBlock, continuationToken, address, err: e },
+          'getEvents failed'
+        );
+
+        await sleep(5000);
+      }
     } while (continuationToken);
 
     return events.map(event => ({
