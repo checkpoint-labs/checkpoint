@@ -174,9 +174,10 @@ export async function queryMulti(
 
         query = query
           .columns(nestedEntitiesMappings[fieldName])
-          .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`);
+          .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`)
+          .whereRaw('?? = ??', [`${tableName}._indexer`, `${nestedTableName}._indexer`]);
 
-        query = applyQueryFilter(query, tableName, {
+        query = applyQueryFilter(query, nestedTableName, {
           block: args.block,
           indexer: args.indexer
         });
