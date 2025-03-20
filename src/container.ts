@@ -249,17 +249,24 @@ export class Container implements Instance {
 
     if (!checkpointBlock && !preloadedBlock) {
       if (blockNum % CHECK_LATEST_BLOCK_INTERVAL === 0) {
-        const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
+        try {
+          const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
 
-        this.log.info({ latestBlock, behind: latestBlock - blockNum }, 'checking latest block');
+          this.log.info({ latestBlock, behind: latestBlock - blockNum }, 'checking latest block');
 
-        if (latestBlock > blockNum + BLOCK_PRELOAD_OFFSET * 2) {
-          this.log.info(
-            { latestBlock, blockNum },
-            `fell more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+          if (latestBlock > blockNum + BLOCK_PRELOAD_OFFSET * 2) {
+            this.log.info(
+              { latestBlock, blockNum },
+              `fell more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+            );
+
+            this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
+          }
+        } catch (e) {
+          this.log.error(
+            { blockNumber: blockNum, err: e },
+            'error occurred during latest block check, ignoring for now'
           );
-
-          this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
         }
       }
     }
