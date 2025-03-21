@@ -1,6 +1,6 @@
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { getAddress } from '@ethersproject/address';
-import { Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
+import { Formatter, Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, LogDescription } from '@ethersproject/abi';
 import { keccak256 } from '@ethersproject/keccak256';
 import { toUtf8Bytes } from '@ethersproject/strings';
@@ -15,8 +15,18 @@ type EventsMap = Record<string, Log[]>;
 
 const MAX_BLOCKS_PER_REQUEST = 10000;
 
+class CustomJsonRpcError extends Error {
+  constructor(message: string, public code: number, public data: any) {
+    super(message);
+  }
+}
+
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
+  /**
+   * Formatter instance from ethers.js used to format raw responses.
+   */
+  private readonly formatter = new Formatter();
   private readonly writers: Record<string, Writer>;
   private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
@@ -224,14 +234,61 @@ export class EvmProvider extends BaseProvider {
     }, {});
   }
 
-  async getLogs(fromBlock: number, toBlock: number, address: string) {
+  /**
+   * This method is simpler implementation of getLogs method.
+   * This allows passing `address` as an array of addresses which is not supported
+   * in ethers v5.
+   * @param filter Logs filter
+   */
+  private async _getLogs({
+    fromBlock,
+    toBlock,
+    address
+  }: {
+    fromBlock: number;
+    toBlock: number;
+    address: string | string[];
+  }): Promise<Log[]> {
+    const res = await fetch(this.instance.config.network_node_url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getLogs',
+        params: [
+          {
+            fromBlock: `0x${fromBlock.toString(16)}`,
+            toBlock: `0x${toBlock.toString(16)}`,
+            address
+          }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+
+    if (json.error) {
+      throw new CustomJsonRpcError(json.error.message, json.error.code, json.error.data);
+    }
+
+    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(json.result);
+  }
+
+  async getLogs(fromBlock: number, toBlock: number, address: string | string[]) {
     const result = [] as Log[];
 
     let currentFrom = fromBlock;
     let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
     while (true) {
       try {
-        const logs = await this.provider.getLogs({
+        const logs = await this._getLogs({
           fromBlock: currentFrom,
           toBlock: currentTo,
           address
@@ -242,21 +299,14 @@ export class EvmProvider extends BaseProvider {
         if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
         currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Handle Infura response size hint
-        if (e.body) {
-          try {
-            const body = JSON.parse(e.body);
-
-            if (body.error.code === -32005) {
-              currentFrom = parseInt(body.error.data.from, 16);
-              currentTo = Math.min(
-                parseInt(body.error.data.to, 16),
-                currentFrom + MAX_BLOCKS_PER_REQUEST
-              );
-              continue;
-            }
-          } catch {}
+        if (e instanceof CustomJsonRpcError) {
+          if (e.code === -32005) {
+            currentFrom = parseInt(e.data.from, 16);
+            currentTo = Math.min(parseInt(e.data.to, 16), currentFrom + MAX_BLOCKS_PER_REQUEST);
+            continue;
+          }
         }
 
         this.log.error(
@@ -275,11 +325,19 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    let events: CheckpointRecord[] = [];
+    const sourceAddresses = this.instance
+      .getCurrentSources(fromBlock)
+      .map(source => source.contract);
 
-    for (const source of this.instance.getCurrentSources(fromBlock)) {
-      const addressEvents = await this.getLogs(fromBlock, toBlock, source.contract);
-      events = events.concat(addressEvents);
+    const chunks: string[][] = [];
+    for (let i = 0; i < sourceAddresses.length; i += 20) {
+      chunks.push(sourceAddresses.slice(i, i + 20));
+    }
+
+    let events: CheckpointRecord[] = [];
+    for (const chunk of chunks) {
+      const chunkEvents = await this.getLogs(fromBlock, toBlock, chunk);
+      events = events.concat(chunkEvents);
     }
 
     return events;
