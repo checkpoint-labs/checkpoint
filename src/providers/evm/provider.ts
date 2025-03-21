@@ -4,10 +4,10 @@ import { Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, LogDescription } from '@ethersproject/abi';
 import { keccak256 } from '@ethersproject/keccak256';
 import { toUtf8Bytes } from '@ethersproject/strings';
-import { CheckpointRecord } from '../../stores/checkpoints';
 import { Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
+import { createGetCheckpointsRange } from '../core/createGetCheckpointsRange';
 
 type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactions']>>;
 type Transaction = BlockWithTransactions['transactions'][number];
@@ -32,6 +32,13 @@ export class EvmProvider extends BaseProvider {
 
     this.provider = new StaticJsonRpcProvider(this.instance.config.network_node_url);
     this.writers = writers;
+
+    this.getCheckpointsRange = createGetCheckpointsRange({
+      sourcesFn: blockNumber => this.instance.getCurrentSources(blockNumber),
+      keyFn: source => source.contract,
+      querySourceFn: async (fromBlock, toBlock, source) =>
+        this.getLogs(fromBlock, toBlock, source.contract)
+    });
   }
 
   formatAddresses(addresses: string[]): string[] {
@@ -272,17 +279,6 @@ export class EvmProvider extends BaseProvider {
       blockNumber: log.blockNumber,
       contractAddress: log.address
     }));
-  }
-
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    let events: CheckpointRecord[] = [];
-
-    for (const source of this.instance.getCurrentSources(fromBlock)) {
-      const addressEvents = await this.getLogs(fromBlock, toBlock, source.contract);
-      events = events.concat(addressEvents);
-    }
-
-    return events;
   }
 
   getEventHash(eventName: string) {

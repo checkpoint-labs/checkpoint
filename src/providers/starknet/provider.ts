@@ -16,6 +16,7 @@ import {
 } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
+import { createGetCheckpointsRange } from '../core/createGetCheckpointsRange';
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
@@ -39,6 +40,18 @@ export class StarknetProvider extends BaseProvider {
       nodeUrl: this.instance.config.network_node_url
     });
     this.writers = writers;
+
+    this.getCheckpointsRangeForAddress = createGetCheckpointsRange({
+      sourcesFn: blockNumber => this.instance.getCurrentSources(blockNumber),
+      keyFn: source => source.contract,
+      querySourceFn: async (fromBlock, toBlock, source) =>
+        this.getCheckpointsRangeForAddress(
+          fromBlock,
+          toBlock,
+          source.contract,
+          source.events.map(event => event.name)
+        )
+    });
   }
 
   public async init() {
