@@ -13,6 +13,15 @@ type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactio
 type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
+type GetLogsBlockHashFilter = {
+  blockHash: string;
+};
+
+type GetLogsBlockRangeFilter = {
+  fromBlock: number;
+  toBlock: number;
+};
+
 const MAX_BLOCKS_PER_REQUEST = 10000;
 
 class CustomJsonRpcError extends Error {
@@ -70,10 +79,7 @@ export class EvmProvider extends BaseProvider {
     let block: BlockWithTransactions | null;
     let eventsMap: EventsMap;
     try {
-      [block, eventsMap] = await Promise.all([
-        this.provider.getBlockWithTransactions(blockNum),
-        this.getEvents(blockNum)
-      ]);
+      block = await this.provider.getBlockWithTransactions(blockNum);
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
@@ -82,6 +88,18 @@ export class EvmProvider extends BaseProvider {
     if (block === null) {
       this.log.info({ blockNumber: blockNum }, 'block not found');
       throw new BlockNotFoundError();
+    }
+
+    try {
+      eventsMap = await this.getEvents(block.hash);
+    } catch (e: unknown) {
+      if (e instanceof CustomJsonRpcError && e.code === -32000) {
+        this.log.info({ blockNumber: blockNum }, 'block events not found');
+        throw new BlockNotFoundError();
+      }
+
+      this.log.error({ blockNumber: blockNum, err: e }, 'getting events failed... retrying');
+      throw e;
     }
 
     if (parentHash && block.parentHash !== parentHash) {
@@ -219,10 +237,9 @@ export class EvmProvider extends BaseProvider {
     this.log.debug({ txIndex }, 'handling transaction done');
   }
 
-  private async getEvents(blockNumber: number | 'latest'): Promise<EventsMap> {
-    const events = await this.provider.getLogs({
-      fromBlock: blockNumber,
-      toBlock: blockNumber
+  private async getEvents(blockHash: string): Promise<EventsMap> {
+    const events = await this._getLogs({
+      blockHash
     });
 
     return events.reduce((acc, event) => {
@@ -236,19 +253,39 @@ export class EvmProvider extends BaseProvider {
 
   /**
    * This method is simpler implementation of getLogs method.
-   * This allows passing `address` as an array of addresses which is not supported
-   * in ethers v5.
+   * This allows using two filters that are not supported in ethers v5:
+   * - `blockHash` to get logs for a specific block - if node doesn't know about that block it will fail.
+   * - `address` as a single address or an array of addresses.
    * @param filter Logs filter
    */
-  private async _getLogs({
-    fromBlock,
-    toBlock,
-    address
-  }: {
-    fromBlock: number;
-    toBlock: number;
-    address: string | string[];
-  }): Promise<Log[]> {
+  private async _getLogs(
+    filter: (GetLogsBlockHashFilter | GetLogsBlockRangeFilter) & {
+      address?: string | string[];
+    }
+  ): Promise<Log[]> {
+    const params: {
+      fromBlock?: string;
+      toBlock?: string;
+      blockHash?: string;
+      address?: string | string[];
+    } = {};
+
+    if ('blockHash' in filter) {
+      params.blockHash = filter.blockHash;
+    }
+
+    if ('fromBlock' in filter) {
+      params.fromBlock = `0x${filter.fromBlock.toString(16)}`;
+    }
+
+    if ('toBlock' in filter) {
+      params.toBlock = `0x${filter.toBlock.toString(16)}`;
+    }
+
+    if ('address' in filter) {
+      params.address = filter.address;
+    }
+
     const res = await fetch(this.instance.config.network_node_url, {
       method: 'POST',
       headers: {
@@ -258,13 +295,7 @@ export class EvmProvider extends BaseProvider {
         jsonrpc: '2.0',
         id: 1,
         method: 'eth_getLogs',
-        params: [
-          {
-            fromBlock: `0x${fromBlock.toString(16)}`,
-            toBlock: `0x${toBlock.toString(16)}`,
-            address
-          }
-        ]
+        params: [params]
       })
     });
 
