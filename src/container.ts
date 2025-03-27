@@ -321,13 +321,18 @@ export class Container implements Instance {
     let current = blockNumber - 1;
     let lastGoodBlock: null | number = null;
     while (lastGoodBlock === null) {
-      const storedBlockHash = await this.store.getBlockHash(this.indexerName, current);
-      const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
+      try {
+        const storedBlockHash = await this.store.getBlockHash(this.indexerName, current);
+        const currentBlockHash = await this.indexer.getProvider().getBlockHash(current);
 
-      if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
-        lastGoodBlock = current;
-      } else {
-        current -= 1;
+        if (storedBlockHash === null || storedBlockHash === currentBlockHash) {
+          lastGoodBlock = current;
+        } else {
+          current -= 1;
+        }
+      } catch (e) {
+        this.log.error({ blockNumber: current, err: e }, 'error occurred during block hash check');
+        await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
       }
     }
 
