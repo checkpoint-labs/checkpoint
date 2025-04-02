@@ -16,7 +16,7 @@ import {
 import { Knex } from 'knex';
 import { Pool as PgPool } from 'pg';
 import { getNonNullType, getDerivedFromDirective } from '../utils/graphql';
-import { getTableName, applyQueryFilter, QueryFilter } from '../utils/database';
+import { getTableName, applyQueryFilter, QueryFilter, applyDefaultOrder } from '../utils/database';
 import { Logger } from '../utils/logger';
 import type DataLoader from 'dataloader';
 
@@ -204,8 +204,13 @@ export async function queryMulti(
   }
 
   if (args.orderBy) {
-    query = query.orderBy(args.orderBy, args.orderDirection?.toLowerCase() || 'desc');
+    query = query.orderBy(
+      `${tableName}.${args.orderBy}`,
+      args.orderDirection?.toLowerCase() || 'desc'
+    );
   }
+
+  query = applyDefaultOrder(query, tableName);
 
   query = query.limit(args?.first || 1000).offset(args?.skip || 0);
   log.debug({ sql: query.toQuery(), args }, 'executing multi query');
