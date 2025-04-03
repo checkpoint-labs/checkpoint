@@ -9,7 +9,7 @@ import {
 } from 'graphql';
 import DataLoader from 'dataloader';
 import { ResolverContextInput } from './resolvers';
-import { getTableName, applyQueryFilter, QueryFilter } from '../utils/database';
+import { getTableName, applyQueryFilter, QueryFilter, applyDefaultOrder } from '../utils/database';
 
 /**
  * Creates getLoader function that will return existing, or create a new dataloader
@@ -31,11 +31,14 @@ export const createGetLoader = (context: ResolverContextInput) => {
           .select('*')
           .from(tableName)
           .whereIn(field, ids as string[]);
+
         query = applyQueryFilter(query, tableName, filter);
+        query = applyDefaultOrder(query, tableName);
 
         context.log.debug({ sql: query.toQuery(), ids }, 'executing batched query');
 
         const results = await query;
+
         const resultsMap = results.reduce((acc, result) => {
           if (!acc[result[field]]) acc[result[field]] = [];
 

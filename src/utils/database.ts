@@ -37,3 +37,19 @@ export function applyQueryFilter(
 
   return filteredQuery;
 }
+
+/**
+ * Applies the default order to the query.
+ * All entities are by default sorted by block_range in ascending order.
+ * This function is used to ensure that the order is consistent across all queries.
+ * @param query Knex query builder
+ * @param tableName The name of the table to apply the order on
+ * @returns The modified query with the default order applied
+ */
+export function applyDefaultOrder(query: Knex.QueryBuilder, tableName: string) {
+  const isInternalTable = INTERNAL_TABLES.includes(tableName);
+
+  if (isInternalTable) return query;
+
+  return query.orderBy(`${tableName}.block_range`);
+}
