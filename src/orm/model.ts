@@ -67,6 +67,7 @@ export default class Model {
       .table(this.tableName)
       .where('id', this.get('id'))
       .andWhere('_indexer', this.indexerName)
+      .andWhereRaw('upper_inf(block_range)')
       .update({
         block_range: register.getKnex().raw('int8range(lower(block_range), ?)', [currentBlock])
       });
