@@ -308,15 +308,11 @@ export class StarknetProvider extends BaseProvider {
         await this.instance.insertCheckpoints([
           { blockNumber, contractAddress: validateAndParseAddress(source.contract) }
         ]);
+
+        const nextSources = this.instance.getCurrentSources(blockNumber);
+        sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+        lastSources = this.instance.getCurrentSources(blockNumber);
       }
-
-      const nextSources = this.instance.getCurrentSources(blockNumber);
-      const newSources = nextSources.filter(
-        nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
-      );
-
-      sourcesQueue = sourcesQueue.concat(newSources);
-      lastSources = nextSources;
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
