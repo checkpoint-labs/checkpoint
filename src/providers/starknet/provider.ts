@@ -232,8 +232,7 @@ export class StarknetProvider extends BaseProvider {
       }
     }
 
-    this.instance.collectSources();
-    const lastSources = this.instance.getCurrentSources(blockNumber);
+    let lastSources = this.instance.getCurrentSources(blockNumber);
     let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
@@ -311,7 +310,9 @@ export class StarknetProvider extends BaseProvider {
         ]);
       }
 
-      sourcesQueue = sourcesQueue.concat(this.instance.collectSources());
+      const nextSources = this.instance.getCurrentSources(blockNumber);
+      sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+      lastSources = this.instance.getCurrentSources(blockNumber);
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');

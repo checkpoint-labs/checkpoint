@@ -42,8 +42,6 @@ export class Container implements Instance {
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
 
-  private newSourcesTracker = 0;
-
   constructor(
     indexerName: string,
     log: Logger,
@@ -113,16 +111,6 @@ export class Container implements Instance {
 
     this.config.sources.push(source);
     this.cpBlocksCache = [];
-  }
-
-  public collectSources() {
-    if (!this.config.sources) this.config.sources = [];
-
-    const newTracker = this.config.sources.length;
-    const newSources = this.config.sources.slice(this.newSourcesTracker);
-
-    this.newSourcesTracker = newTracker;
-    return newSources;
   }
 
   public async executeTemplate(
