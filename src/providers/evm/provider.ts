@@ -182,6 +182,7 @@ export class EvmProvider extends BaseProvider {
     }
 
     let lastSources = this.instance.getCurrentSources(blockNumber);
+    let shouldUpdateSourcesQueue = false;
     let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
@@ -220,14 +221,18 @@ export class EvmProvider extends BaseProvider {
                 eventIndex,
                 helpers
               });
+
+              shouldUpdateSourcesQueue = true;
             }
           }
         }
       }
 
-      const nextSources = this.instance.getCurrentSources(blockNumber);
-      sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
-      lastSources = this.instance.getCurrentSources(blockNumber);
+      if (shouldUpdateSourcesQueue) {
+        const nextSources = this.instance.getCurrentSources(blockNumber);
+        sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+        lastSources = this.instance.getCurrentSources(blockNumber);
+      }
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
