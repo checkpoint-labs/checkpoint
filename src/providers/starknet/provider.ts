@@ -311,9 +311,9 @@ export class StarknetProvider extends BaseProvider {
       }
 
       const nextSources = this.instance.getCurrentSources(blockNumber);
-      const newSources = nextSources.filter(
-        nextSource => !lastSources.find(lastSource => lastSource.contract === nextSource.contract)
-      );
+
+      const lastSourcesSet = new Set(lastSources.map(source => source.contract));
+      const newSources = nextSources.filter(nextSource => !lastSourcesSet.has(nextSource.contract));
 
       sourcesQueue = sourcesQueue.concat(newSources);
       lastSources = nextSources;
