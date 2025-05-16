@@ -4,6 +4,7 @@ import { CheckpointConfig, ContractSourceConfig } from '../types';
 
 export type Instance = {
   config: CheckpointConfig;
+  collectSources: () => ContractSourceConfig[];
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
   setBlockHash(blockNum: number, hash: string);
   setLastIndexedBlock(blockNum: number);

@@ -181,7 +181,8 @@ export class EvmProvider extends BaseProvider {
       }
     }
 
-    let lastSources = this.instance.getCurrentSources(blockNumber);
+    this.instance.collectSources();
+    const lastSources = this.instance.getCurrentSources(blockNumber);
     let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
@@ -225,13 +226,7 @@ export class EvmProvider extends BaseProvider {
         }
       }
 
-      const nextSources = this.instance.getCurrentSources(blockNumber);
-
-      const lastSourcesSet = new Set(lastSources.map(source => source.contract));
-      const newSources = nextSources.filter(nextSource => !lastSourcesSet.has(nextSource.contract));
-
-      sourcesQueue = sourcesQueue.concat(newSources);
-      lastSources = nextSources;
+      sourcesQueue = sourcesQueue.concat(this.instance.collectSources());
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
