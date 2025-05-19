@@ -182,17 +182,18 @@ export class EvmProvider extends BaseProvider {
     }
 
     let lastSources = this.instance.getCurrentSources(blockNumber);
-    let shouldUpdateSourcesQueue = false;
     let sourcesQueue = [...lastSources];
 
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
+      let foundContractData = false;
       for (const [eventIndex, log] of logs.entries()) {
         if (this.compareAddress(source.contract, log.address)) {
           for (const sourceEvent of source.events) {
             const targetTopic = this.getEventHash(sourceEvent.name);
 
             if (targetTopic === log.topics[0]) {
+              foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
                 'found contract event'
@@ -221,14 +222,16 @@ export class EvmProvider extends BaseProvider {
                 eventIndex,
                 helpers
               });
-
-              shouldUpdateSourcesQueue = true;
             }
           }
         }
       }
 
-      if (shouldUpdateSourcesQueue) {
+      if (foundContractData) {
+        await this.instance.insertCheckpoints([
+          { blockNumber, contractAddress: getAddress(source.contract) }
+        ]);
+
         const nextSources = this.instance.getCurrentSources(blockNumber);
         sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
         lastSources = this.instance.getCurrentSources(blockNumber);
