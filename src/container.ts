@@ -224,7 +224,9 @@ export class Container implements Instance {
       this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
 
       if (checkpoints.length > 0) {
-        this.preloadedBlocks = [...new Set(checkpoints.map(cp => cp.blockNumber).sort())];
+        this.preloadedBlocks = [
+          ...new Set(checkpoints.map(cp => cp.blockNumber).sort((a, b) => a - b))
+        ];
         return this.preloadedBlocks.shift() as number;
       }
 
