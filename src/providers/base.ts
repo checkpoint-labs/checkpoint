@@ -81,7 +81,7 @@ export class BaseProvider {
     throw new Error(`processBlock method was not defined when fetching block ${blockNum}`);
   }
 
-  processPool(blockNumber: number) {
+  processPool(blockNumber: number): Promise<void> {
     throw new Error(
       `processPool method was not defined when fetching pool for block ${blockNumber}`
     );
