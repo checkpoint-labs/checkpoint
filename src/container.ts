@@ -196,7 +196,7 @@ export class Container implements Instance {
     this.preloadEndBlock =
       (await this.indexer.getProvider().getLatestBlockNumber()) - BLOCK_PRELOAD_OFFSET;
 
-    return await this.next(blockNum);
+    return this.process(blockNum);
   }
 
   private async preload(blockNum: number) {
@@ -236,84 +236,102 @@ export class Container implements Instance {
     return null;
   }
 
-  private async next(blockNum: number) {
-    let checkpointBlock, preloadedBlock;
-    if (!this.config.tx_fn && !this.config.global_events) {
-      checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+  private async process(startBlockNumber: number) {
+    let blockNumber = startBlockNumber;
 
-      if (checkpointBlock) {
-        blockNum = checkpointBlock;
-      } else if (blockNum <= this.preloadEndBlock) {
-        preloadedBlock = await this.preload(blockNum);
-        blockNum = preloadedBlock || this.preloadEndBlock + 1;
+    while (true) {
+      let checkpointBlock: number | null = null;
+      let preloadedBlock: number | null = null;
+
+      if (!this.config.tx_fn && !this.config.global_events) {
+        checkpointBlock = await this.getNextCheckpointBlock(blockNumber);
+
+        if (checkpointBlock) {
+          blockNumber = checkpointBlock;
+        } else if (blockNumber <= this.preloadEndBlock) {
+          preloadedBlock = await this.preload(blockNumber);
+          blockNumber = preloadedBlock || this.preloadEndBlock + 1;
+        }
       }
-    }
 
-    if (!checkpointBlock && !preloadedBlock) {
-      if (blockNum % CHECK_LATEST_BLOCK_INTERVAL === 0) {
-        try {
-          const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
+      if (!checkpointBlock && !preloadedBlock) {
+        if (blockNumber % CHECK_LATEST_BLOCK_INTERVAL === 0) {
+          try {
+            const latestBlock = await this.indexer.getProvider().getLatestBlockNumber();
 
-          this.log.info({ latestBlock, behind: latestBlock - blockNum }, 'checking latest block');
-
-          if (latestBlock > blockNum + BLOCK_PRELOAD_OFFSET * 2) {
             this.log.info(
-              { latestBlock, blockNum },
-              `fell more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+              { latestBlock, behind: latestBlock - blockNumber },
+              'checking latest block'
             );
 
-            this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
+            if (latestBlock > blockNumber + BLOCK_PRELOAD_OFFSET * 2) {
+              this.log.info(
+                { latestBlock, blockNum: blockNumber },
+                `fell more than ${BLOCK_PRELOAD_OFFSET * 2} blocks behind, reverting to preload`
+              );
+
+              this.preloadEndBlock = latestBlock - BLOCK_PRELOAD_OFFSET;
+            }
+          } catch (e) {
+            this.log.error(
+              { blockNumber: blockNumber, err: e },
+              'error occurred during latest block check, ignoring for now'
+            );
           }
-        } catch (e) {
+        }
+      }
+
+      this.log.debug({ blockNumber: blockNumber }, 'next block');
+
+      try {
+        register.setCurrentBlock(this.indexerName, BigInt(blockNumber));
+
+        const initialSources = this.getCurrentSources(blockNumber);
+        const parentHash = await this.getBlockHash(blockNumber - 1);
+        const nextBlockNumber = await this.indexer
+          .getProvider()
+          .processBlock(blockNumber, parentHash);
+        const sources = this.getCurrentSources(nextBlockNumber);
+
+        if (initialSources.length !== sources.length) {
+          this.preloadedBlocks = [];
+        }
+
+        blockNumber = nextBlockNumber;
+      } catch (err) {
+        if (err instanceof BlockNotFoundError) {
+          if (this.config.optimistic_indexing) {
+            try {
+              await this.indexer.getProvider().processPool(blockNumber);
+            } catch (err) {
+              this.log.error(
+                { blockNumber: blockNumber, err },
+                'error occurred during pool processing'
+              );
+            }
+          }
+        } else if (err instanceof ReorgDetectedError) {
+          blockNumber = await this.handleReorg(blockNumber);
+          continue;
+        } else {
           this.log.error(
-            { blockNumber: blockNum, err: e },
-            'error occurred during latest block check, ignoring for now'
+            { blockNumber: blockNumber, err },
+            'error occurred during block processing'
           );
         }
-      }
-    }
 
-    this.log.debug({ blockNumber: blockNum }, 'next block');
+        // NOTE: should we do it on reorg?
 
-    try {
-      register.setCurrentBlock(this.indexerName, BigInt(blockNum));
-
-      const initialSources = this.getCurrentSources(blockNum);
-      const parentHash = await this.getBlockHash(blockNum - 1);
-      const nextBlockNumber = await this.indexer.getProvider().processBlock(blockNum, parentHash);
-      const sources = this.getCurrentSources(nextBlockNumber);
-
-      if (initialSources.length !== sources.length) {
-        this.preloadedBlocks = [];
-      }
-
-      return this.next(nextBlockNumber);
-    } catch (err) {
-      if (err instanceof BlockNotFoundError) {
-        if (this.config.optimistic_indexing) {
-          try {
-            await this.indexer.getProvider().processPool(blockNum);
-          } catch (err) {
-            this.log.error({ blockNumber: blockNum, err }, 'error occurred during pool processing');
-          }
+        if (checkpointBlock && this.cpBlocksCache) {
+          this.cpBlocksCache.unshift(checkpointBlock);
         }
-      } else if (err instanceof ReorgDetectedError) {
-        const nextBlockNumber = await this.handleReorg(blockNum);
-        return this.next(nextBlockNumber);
-      } else {
-        this.log.error({ blockNumber: blockNum, err }, 'error occurred during block processing');
-      }
 
-      if (checkpointBlock && this.cpBlocksCache) {
-        this.cpBlocksCache.unshift(checkpointBlock);
-      }
+        if (preloadedBlock && this.preloadedBlocks) {
+          this.preloadedBlocks.unshift(preloadedBlock);
+        }
 
-      if (preloadedBlock && this.preloadedBlocks) {
-        this.preloadedBlocks.unshift(preloadedBlock);
+        await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
       }
-
-      await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
-      return this.next(blockNum);
     }
   }
 
