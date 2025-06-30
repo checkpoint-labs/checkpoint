@@ -317,7 +317,7 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getLogs(fromBlock: number, toBlock: number, address: string | string[]) {
-    const result = [] as Log[];
+    let result = [] as Log[];
 
     let currentFrom = fromBlock;
     let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
@@ -329,7 +329,7 @@ export class EvmProvider extends BaseProvider {
           address
         });
 
-        result.push(...logs);
+        result = result.concat(logs);
 
         if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
