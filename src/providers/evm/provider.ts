@@ -5,12 +5,10 @@ import { Interface, LogDescription } from '@ethersproject/abi';
 import { keccak256 } from '@ethersproject/keccak256';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Writer } from './types';
+import { Block, Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
 
-type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactions']>>;
-type Transaction = BlockWithTransactions['transactions'][number];
 type EventsMap = Record<string, Log[]>;
 
 type GetLogsBlockHashFilter = {
@@ -76,10 +74,10 @@ export class EvmProvider extends BaseProvider {
   }
 
   async processBlock(blockNum: number, parentHash: string | null) {
-    let block: BlockWithTransactions | null;
+    let block: Block | null;
     let eventsMap: EventsMap;
     try {
-      block = await this.provider.getBlockWithTransactions(blockNum);
+      block = await this.provider.getBlock(blockNum);
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
@@ -116,15 +114,13 @@ export class EvmProvider extends BaseProvider {
     return blockNum + 1;
   }
 
-  private async handleBlock(block: BlockWithTransactions, eventsMap: EventsMap) {
+  private async handleBlock(block: Block, eventsMap: EventsMap) {
     this.log.info({ blockNumber: block.number }, 'handling block');
 
-    const txsToCheck = block.transactions.filter(
-      tx => !this.processedPoolTransactions.has(tx.hash)
-    );
+    const txsToCheck = block.transactions.filter(txId => !this.processedPoolTransactions.has(txId));
 
-    for (const [i, tx] of txsToCheck.entries()) {
-      await this.handleTx(block, block.number, i, tx, tx.hash ? eventsMap[tx.hash] || [] : []);
+    for (const [i, txId] of txsToCheck.entries()) {
+      await this.handleTx(block, block.number, i, txId, eventsMap[txId] || []);
     }
 
     this.processedPoolTransactions.clear();
@@ -133,10 +129,10 @@ export class EvmProvider extends BaseProvider {
   }
 
   private async handleTx(
-    block: BlockWithTransactions | null,
+    block: Block | null,
     blockNumber: number,
     txIndex: number,
-    tx: Transaction,
+    txId: string,
     logs: Log[]
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
@@ -147,7 +143,7 @@ export class EvmProvider extends BaseProvider {
       await this.writers[this.instance.config.tx_fn]({
         blockNumber,
         block,
-        tx,
+        txId,
         helpers
       });
     }
@@ -173,7 +169,7 @@ export class EvmProvider extends BaseProvider {
         await this.writers[handler.fn]({
           block,
           blockNumber,
-          tx,
+          txId,
           rawEvent: event,
           eventIndex,
           helpers
@@ -206,7 +202,7 @@ export class EvmProvider extends BaseProvider {
                   parsedEvent = iface.parseLog(log);
                 } catch (err) {
                   this.log.warn(
-                    { contract: source.contract, txType: tx.type, handlerFn: sourceEvent.fn },
+                    { contract: source.contract, txId, handlerFn: sourceEvent.fn },
                     'failed to parse event'
                   );
                 }
@@ -216,7 +212,7 @@ export class EvmProvider extends BaseProvider {
                 source,
                 block,
                 blockNumber,
-                tx,
+                txId,
                 rawEvent: log,
                 event: parsedEvent,
                 eventIndex,

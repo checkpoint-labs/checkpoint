@@ -2,13 +2,12 @@ import { Provider, Log } from '@ethersproject/providers';
 import { LogDescription } from '@ethersproject/abi';
 import { BaseWriterParams } from '../../types';
 
-type BlockWithTransactions = Awaited<ReturnType<Provider['getBlockWithTransactions']>>;
-type Transaction = BlockWithTransactions['transactions'][number];
+export type Block = Awaited<ReturnType<Provider['getBlock']>>;
 
 export type Writer = (
   args: {
-    tx: Transaction;
-    block: BlockWithTransactions | null;
+    txId: string;
+    block: Block | null;
     rawEvent?: Log;
     event?: LogDescription;
   } & BaseWriterParams
