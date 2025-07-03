@@ -206,7 +206,7 @@ export class EvmProvider extends BaseProvider {
                   parsedEvent = iface.parseLog(log);
                 } catch (err) {
                   this.log.warn(
-                    { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
+                    { contract: source.contract, txType: tx.type, handlerFn: sourceEvent.fn },
                     'failed to parse event'
                   );
                 }

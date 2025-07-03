@@ -11,7 +11,6 @@ import {
   EventsMap,
   ParsedEvent,
   isFullBlock,
-  isDeployTransaction,
   Writer
 } from './types';
 import { ContractSourceConfig } from '../../types';
@@ -240,27 +239,6 @@ export class StarknetProvider extends BaseProvider {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
-      if (
-        isDeployTransaction(tx) &&
-        source.deploy_fn &&
-        contract === validateAndParseAddress(tx.contract_address)
-      ) {
-        this.log.info(
-          { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
-          'found deployment transaction'
-        );
-
-        await this.writers[source.deploy_fn]({
-          source,
-          block,
-          blockNumber,
-          tx,
-          helpers
-        });
-
-        wasTransactionProcessed = true;
-      }
-
       for (const [eventIndex, event] of events.entries()) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
@@ -277,7 +255,7 @@ export class StarknetProvider extends BaseProvider {
                   parsedEvent = parseEvent(this.abis[source.abi], event);
                 } catch (err) {
                   this.log.warn(
-                    { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
+                    { contract: source.contract, txType: tx.type, handlerFn: sourceEvent.fn },
                     'failed to parse event'
                   );
                 }

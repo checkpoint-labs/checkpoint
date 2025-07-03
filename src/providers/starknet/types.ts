@@ -26,7 +26,3 @@ export type Writer = (
 export function isFullBlock(block: Block): block is FullBlock {
   return 'block_number' in block;
 }
-
-export function isDeployTransaction(tx: Transaction | PendingTransaction): tx is DeployTransaction {
-  return tx.type === 'DEPLOY';
-}
