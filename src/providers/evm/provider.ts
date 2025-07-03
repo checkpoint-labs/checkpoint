@@ -38,6 +38,7 @@ export class EvmProvider extends BaseProvider {
   private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
+  private logsCache = new Map<number, Log[]>();
 
   constructor({
     instance,
@@ -89,7 +90,10 @@ export class EvmProvider extends BaseProvider {
     }
 
     try {
-      eventsMap = await this.getEvents(block.hash);
+      eventsMap = await this.getEvents({
+        blockNumber: blockNum,
+        blockHash: block.hash
+      });
     } catch (e: unknown) {
       if (e instanceof CustomJsonRpcError && e.code === -32000) {
         this.log.info({ blockNumber: blockNum }, 'block events not found');
@@ -237,10 +241,22 @@ export class EvmProvider extends BaseProvider {
     this.log.debug({ txIndex }, 'handling transaction done');
   }
 
-  private async getEvents(blockHash: string): Promise<EventsMap> {
-    const events = await this._getLogs({
-      blockHash
-    });
+  private async getEvents({
+    blockHash,
+    blockNumber
+  }: {
+    blockHash: string;
+    blockNumber: number;
+  }): Promise<EventsMap> {
+    let events: Log[] = [];
+    if (this.logsCache.has(blockNumber)) {
+      events = this.logsCache.get(blockNumber) || [];
+      this.logsCache.delete(blockNumber);
+    } else {
+      events = await this._getLogs({
+        blockHash
+      });
+    }
 
     return events.reduce((acc, event) => {
       if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
@@ -361,10 +377,7 @@ export class EvmProvider extends BaseProvider {
       }
     }
 
-    return result.map(log => ({
-      blockNumber: log.blockNumber,
-      contractAddress: log.address
-    }));
+    return result;
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
@@ -375,7 +388,7 @@ export class EvmProvider extends BaseProvider {
       chunks.push(sources.slice(i, i + 20));
     }
 
-    let events: CheckpointRecord[] = [];
+    let events: Log[] = [];
     for (const chunk of chunks) {
       const address = chunk.map(source => source.contract);
       const topics = chunk.flatMap(source =>
@@ -386,7 +399,18 @@ export class EvmProvider extends BaseProvider {
       events = events.concat(chunkEvents);
     }
 
-    return events;
+    for (const log of events) {
+      if (!this.logsCache.has(log.blockNumber)) {
+        this.logsCache.set(log.blockNumber, []);
+      }
+
+      this.logsCache.get(log.blockNumber)?.push(log);
+    }
+
+    return events.map(log => ({
+      blockNumber: log.blockNumber,
+      contractAddress: log.address
+    }));
   }
 
   getEventHash(eventName: string) {
@@ -399,5 +423,10 @@ export class EvmProvider extends BaseProvider {
 
   compareAddress(a: string, b: string) {
     return a.toLowerCase() === b.toLowerCase();
+  }
+
+  handleNewSourceAdded(): void {
+    this.log.info('New source added, clearing logs cache');
+    this.logsCache.clear();
   }
 }

@@ -92,6 +92,10 @@ export class BaseProvider {
       `getCheckpointsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
     );
   }
+
+  handleNewSourceAdded() {
+    throw new Error('handleNewSourceAdded method was not defined');
+  }
 }
 
 export class BaseIndexer {

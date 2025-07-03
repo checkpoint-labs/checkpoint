@@ -2,16 +2,7 @@ import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import {
-  Block,
-  FullBlock,
-  PendingTransaction,
-  Event,
-  EventsMap,
-  ParsedEvent,
-  isFullBlock,
-  Writer
-} from './types';
+import { Block, FullBlock, Event, EventsMap, ParsedEvent, isFullBlock, Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
 
@@ -22,6 +13,7 @@ export class StarknetProvider extends BaseProvider {
   private processedTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
+  private logsCache = new Map<number, Event[]>();
 
   constructor({
     instance,
@@ -281,19 +273,24 @@ export class StarknetProvider extends BaseProvider {
   private async getEvents(blockNumber: number): Promise<EventsMap> {
     let events: Event[] = [];
 
-    let continuationToken: string | undefined;
-    do {
-      const result = await this.provider.getEvents({
-        from_block: { block_number: blockNumber },
-        to_block: { block_number: blockNumber },
-        chunk_size: 1000,
-        continuation_token: continuationToken
-      });
+    if (this.logsCache.has(blockNumber)) {
+      events = this.logsCache.get(blockNumber) || [];
+      this.logsCache.delete(blockNumber);
+    } else {
+      let continuationToken: string | undefined;
+      do {
+        const result = await this.provider.getEvents({
+          from_block: { block_number: blockNumber },
+          to_block: { block_number: blockNumber },
+          chunk_size: 1000,
+          continuation_token: continuationToken
+        });
 
-      events = events.concat(result.events);
+        events = events.concat(result.events);
 
-      continuationToken = result.continuation_token;
-    } while (continuationToken);
+        continuationToken = result.continuation_token;
+      } while (continuationToken);
+    }
 
     if (
       events.length === 0 &&
@@ -312,12 +309,12 @@ export class StarknetProvider extends BaseProvider {
     }, {});
   }
 
-  async getCheckpointsRangeForAddress(
+  async getEventsRangeForAddress(
     fromBlock: number,
     toBlock: number,
     address: string,
     eventNames: string[]
-  ): Promise<CheckpointRecord[]> {
+  ): Promise<Event[]> {
     let events: Event[] = [];
 
     let continuationToken: string | undefined;
@@ -345,17 +342,14 @@ export class StarknetProvider extends BaseProvider {
       }
     } while (continuationToken);
 
-    return events.map(event => ({
-      blockNumber: event.block_number,
-      contractAddress: validateAndParseAddress(event.from_address)
-    }));
+    return events;
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    let events: CheckpointRecord[] = [];
+    let events: Event[] = [];
 
     for (const source of this.instance.getCurrentSources(fromBlock)) {
-      const addressEvents = await this.getCheckpointsRangeForAddress(
+      const addressEvents = await this.getEventsRangeForAddress(
         fromBlock,
         toBlock,
         source.contract,
@@ -364,7 +358,18 @@ export class StarknetProvider extends BaseProvider {
       events = events.concat(addressEvents);
     }
 
-    return events;
+    for (const log of events) {
+      if (!this.logsCache.has(log.block_number)) {
+        this.logsCache.set(log.block_number, []);
+      }
+
+      this.logsCache.get(log.block_number)?.push(log);
+    }
+
+    return events.map(event => ({
+      blockNumber: event.block_number,
+      contractAddress: validateAndParseAddress(event.from_address)
+    }));
   }
 
   getEventHash(eventName: string) {
@@ -373,5 +378,10 @@ export class StarknetProvider extends BaseProvider {
     }
 
     return this.sourceHashes.get(eventName) as string;
+  }
+
+  handleNewSourceAdded(): void {
+    this.log.info('New source added, clearing logs cache');
+    this.logsCache.clear();
   }
 }
