@@ -9,7 +9,6 @@ export const contractSourceConfigSchema = z.object({
   contract: z.string(),
   abi: z.string().optional(),
   start: z.number().gte(0),
-  deploy_fn: z.string().optional(),
   events: z.array(contractEventConfigSchema)
 });
 
