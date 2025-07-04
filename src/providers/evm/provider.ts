@@ -261,6 +261,7 @@ export class EvmProvider extends BaseProvider {
   private async _getLogs(
     filter: (GetLogsBlockHashFilter | GetLogsBlockRangeFilter) & {
       address?: string | string[];
+      topics?: (string | string[])[];
     }
   ): Promise<Log[]> {
     const params: {
@@ -268,6 +269,7 @@ export class EvmProvider extends BaseProvider {
       toBlock?: string;
       blockHash?: string;
       address?: string | string[];
+      topics?: (string | string[])[];
     } = {};
 
     if ('blockHash' in filter) {
@@ -284,6 +286,10 @@ export class EvmProvider extends BaseProvider {
 
     if ('address' in filter) {
       params.address = filter.address;
+    }
+
+    if ('topics' in filter) {
+      params.topics = filter.topics;
     }
 
     const res = await fetch(this.instance.config.network_node_url, {
@@ -312,7 +318,12 @@ export class EvmProvider extends BaseProvider {
     return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(json.result);
   }
 
-  async getLogs(fromBlock: number, toBlock: number, address: string | string[]) {
+  async getLogs(
+    fromBlock: number,
+    toBlock: number,
+    address: string | string[],
+    topics: (string | string[])[] = []
+  ): Promise<Log[]> {
     let result = [] as Log[];
 
     let currentFrom = fromBlock;
@@ -322,7 +333,8 @@ export class EvmProvider extends BaseProvider {
         const logs = await this._getLogs({
           fromBlock: currentFrom,
           toBlock: currentTo,
-          address
+          address,
+          topics
         });
 
         result = result.concat(logs);
@@ -356,18 +368,21 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const sourceAddresses = this.instance
-      .getCurrentSources(fromBlock)
-      .map(source => source.contract);
+    const sources = this.instance.getCurrentSources(fromBlock);
 
-    const chunks: string[][] = [];
-    for (let i = 0; i < sourceAddresses.length; i += 20) {
-      chunks.push(sourceAddresses.slice(i, i + 20));
+    const chunks: ContractSourceConfig[][] = [];
+    for (let i = 0; i < sources.length; i += 20) {
+      chunks.push(sources.slice(i, i + 20));
     }
 
     let events: CheckpointRecord[] = [];
     for (const chunk of chunks) {
-      const chunkEvents = await this.getLogs(fromBlock, toBlock, chunk);
+      const address = chunk.map(source => source.contract);
+      const topics = chunk.flatMap(source =>
+        source.events.map(event => this.getEventHash(event.name))
+      );
+
+      const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [topics]);
       events = events.concat(chunkEvents);
     }
 
