@@ -5,7 +5,6 @@ import { CheckpointRecord } from '../../stores/checkpoints';
 import {
   Block,
   FullBlock,
-  Transaction,
   PendingTransaction,
   Event,
   EventsMap,
@@ -67,7 +66,7 @@ export class StarknetProvider extends BaseProvider {
     let blockEvents: EventsMap;
     try {
       [block, blockEvents] = await Promise.all([
-        this.provider.getBlockWithTxs(blockNum),
+        this.provider.getBlockWithTxHashes(blockNum),
         this.getEvents(blockNum)
       ]);
     } catch (e) {
@@ -102,26 +101,23 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async processPool(blockNumber: number) {
-    const block = await this.provider.getBlockWithTxs('pending');
+    const block = await this.provider.getBlockWithTxHashes('pending');
     const receipts = await Promise.all(
-      block.transactions.map(async tx => {
-        if (!tx.transaction_hash || this.seenPoolTransactions.has(tx.transaction_hash)) {
+      block.transactions.map(async txId => {
+        if (this.seenPoolTransactions.has(txId)) {
           return null;
         }
 
         try {
-          return await this.provider.getTransactionReceipt(tx.transaction_hash);
+          return await this.provider.getTransactionReceipt(txId);
         } catch (err) {
-          this.log.warn(
-            { transactionHash: tx.transaction_hash, err },
-            'getting transaction receipt failed'
-          );
+          this.log.warn({ transactionHash: txId, err }, 'getting transaction receipt failed');
           return null;
         }
       })
     );
 
-    const txsWithReceipts = block.transactions.filter((_, index) => receipts[index] !== null);
+    const txIds = block.transactions.filter((_, index) => receipts[index] !== null);
     const eventsMap = receipts.reduce((acc, receipt) => {
       if (receipt === null) return acc;
 
@@ -129,24 +125,16 @@ export class StarknetProvider extends BaseProvider {
       return acc;
     }, {});
 
-    await this.handlePool(txsWithReceipts, eventsMap, blockNumber);
+    await this.handlePool(txIds, eventsMap, blockNumber);
   }
 
   private async handleBlock(block: FullBlock, eventsMap: EventsMap) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    const txsToCheck = block.transactions.filter(
-      tx => !this.seenPoolTransactions.has(tx.transaction_hash)
-    );
+    const txsToCheck = block.transactions.filter(txId => !this.seenPoolTransactions.has(txId));
 
-    for (const [i, tx] of txsToCheck.entries()) {
-      await this.handleTx(
-        block,
-        block.block_number,
-        i,
-        tx,
-        tx.transaction_hash ? eventsMap[tx.transaction_hash] || [] : []
-      );
+    for (const [i, txId] of txsToCheck.entries()) {
+      await this.handleTx(block, block.block_number, i, txId, eventsMap[txId] || []);
     }
 
     this.seenPoolTransactions.clear();
@@ -154,19 +142,13 @@ export class StarknetProvider extends BaseProvider {
     this.log.debug({ blockNumber: block.block_number }, 'handling block done');
   }
 
-  private async handlePool(txs: PendingTransaction[], eventsMap: EventsMap, blockNumber: number) {
+  private async handlePool(txIds: string[], eventsMap: EventsMap, blockNumber: number) {
     this.log.info('handling pool');
 
-    for (const [i, tx] of txs.entries()) {
-      await this.handleTx(
-        null,
-        blockNumber,
-        i,
-        tx,
-        tx.transaction_hash ? eventsMap[tx.transaction_hash] || [] : []
-      );
+    for (const [i, txId] of txIds.entries()) {
+      await this.handleTx(null, blockNumber, i, txId, eventsMap[txId] || []);
 
-      this.seenPoolTransactions.add(tx.transaction_hash);
+      this.seenPoolTransactions.add(txId);
     }
 
     this.log.info('handling pool done');
@@ -176,13 +158,13 @@ export class StarknetProvider extends BaseProvider {
     block: FullBlock | null,
     blockNumber: number,
     txIndex: number,
-    tx: Transaction,
+    txId: string,
     events: Event[]
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
-    if (this.processedTransactions.has(tx.transaction_hash)) {
-      this.log.warn({ hash: tx.transaction_hash }, 'transaction already processed');
+    if (this.processedTransactions.has(txId)) {
+      this.log.warn({ hash: txId }, 'transaction already processed');
       return;
     }
 
@@ -193,7 +175,7 @@ export class StarknetProvider extends BaseProvider {
       await this.writers[this.instance.config.tx_fn]({
         blockNumber,
         block,
-        tx,
+        txId,
         helpers
       });
 
@@ -221,7 +203,7 @@ export class StarknetProvider extends BaseProvider {
         await this.writers[handler.fn]({
           block,
           blockNumber,
-          tx,
+          txId,
           rawEvent: event,
           eventIndex,
           helpers
@@ -255,7 +237,7 @@ export class StarknetProvider extends BaseProvider {
                   parsedEvent = parseEvent(this.abis[source.abi], event);
                 } catch (err) {
                   this.log.warn(
-                    { contract: source.contract, txType: tx.type, handlerFn: sourceEvent.fn },
+                    { contract: source.contract, txId, handlerFn: sourceEvent.fn },
                     'failed to parse event'
                   );
                 }
@@ -265,7 +247,7 @@ export class StarknetProvider extends BaseProvider {
                 source,
                 block,
                 blockNumber,
-                tx,
+                txId,
                 rawEvent: event,
                 event: parsedEvent,
                 eventIndex,
@@ -279,7 +261,7 @@ export class StarknetProvider extends BaseProvider {
       }
 
       if (wasTransactionProcessed) {
-        this.processedTransactions.add(tx.transaction_hash);
+        this.processedTransactions.add(txId);
       }
 
       if (foundContractData) {
