@@ -54,13 +54,21 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async processBlock(blockNum: number, parentHash: string | null) {
-    let block: Block;
+    let block: Block | null = null;
     let blockEvents: EventsMap;
     try {
-      [block, blockEvents] = await Promise.all([
-        this.provider.getBlockWithTxHashes(blockNum),
-        this.getEvents(blockNum)
-      ]);
+      const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
+      const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
+
+      if (hasPreloadedBlockEvents) {
+        block = null;
+        blockEvents = await this.getEvents(blockNum);
+      } else {
+        [block, blockEvents] = await Promise.all([
+          this.provider.getBlockWithTxHashes(blockNum),
+          this.getEvents(blockNum)
+        ]);
+      }
     } catch (e) {
       if ((e as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
@@ -71,23 +79,23 @@ export class StarknetProvider extends BaseProvider {
       throw e;
     }
 
-    if (parentHash && block.parent_hash !== parentHash) {
+    if (block && parentHash && block.parent_hash !== parentHash) {
       this.log.error({ blockNumber: blockNum }, 'reorg detected');
       throw new ReorgDetectedError();
     }
 
-    if (!isFullBlock(block) || block.block_number !== blockNum) {
+    if (block && (!isFullBlock(block) || block.block_number !== blockNum)) {
       this.log.error({ blockNumber: blockNum }, 'invalid block');
       throw new Error('invalid block');
     }
 
-    await this.handleBlock(block, blockEvents);
+    await this.handleBlock(blockNum, block, blockEvents);
 
-    if (isFullBlock(block)) {
+    if (block && isFullBlock(block)) {
       await this.instance.setBlockHash(blockNum, block.block_hash);
     }
 
-    await this.instance.setLastIndexedBlock(block.block_number);
+    await this.instance.setLastIndexedBlock(blockNum);
 
     return blockNum + 1;
   }
@@ -120,18 +128,19 @@ export class StarknetProvider extends BaseProvider {
     await this.handlePool(txIds, eventsMap, blockNumber);
   }
 
-  private async handleBlock(block: FullBlock, eventsMap: EventsMap) {
-    this.log.info({ blockNumber: block.block_number }, 'handling block');
+  private async handleBlock(blockNumber, block: FullBlock | null, eventsMap: EventsMap) {
+    this.log.info({ blockNumber }, 'handling block');
 
-    const txsToCheck = block.transactions.filter(txId => !this.seenPoolTransactions.has(txId));
+    const blockTransactions = Object.keys(eventsMap);
+    const txsToCheck = blockTransactions.filter(txId => !this.seenPoolTransactions.has(txId));
 
     for (const [i, txId] of txsToCheck.entries()) {
-      await this.handleTx(block, block.block_number, i, txId, eventsMap[txId] || []);
+      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
     }
 
     this.seenPoolTransactions.clear();
 
-    this.log.debug({ blockNumber: block.block_number }, 'handling block done');
+    this.log.debug({ blockNumber }, 'handling block done');
   }
 
   private async handlePool(txIds: string[], eventsMap: EventsMap, blockNumber: number) {

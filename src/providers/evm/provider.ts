@@ -75,16 +75,22 @@ export class EvmProvider extends BaseProvider {
   }
 
   async processBlock(blockNum: number, parentHash: string | null) {
-    let block: Block | null;
+    let block: Block | null = null;
     let eventsMap: EventsMap;
+
+    const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
+    const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
+
     try {
-      block = await this.provider.getBlock(blockNum);
+      if (!hasPreloadedBlockEvents) {
+        block = await this.provider.getBlock(blockNum);
+      }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
       throw e;
     }
 
-    if (block === null) {
+    if (!hasPreloadedBlockEvents && block === null) {
       this.log.info({ blockNumber: blockNum }, 'block not found');
       throw new BlockNotFoundError();
     }
@@ -92,7 +98,7 @@ export class EvmProvider extends BaseProvider {
     try {
       eventsMap = await this.getEvents({
         blockNumber: blockNum,
-        blockHash: block.hash
+        blockHash: block?.hash ?? null
       });
     } catch (e: unknown) {
       if (e instanceof CustomJsonRpcError && e.code === -32000) {
@@ -104,32 +110,35 @@ export class EvmProvider extends BaseProvider {
       throw e;
     }
 
-    if (parentHash && block.parentHash !== parentHash) {
+    if (block && parentHash && block.parentHash !== parentHash) {
       this.log.error({ blockNumber: blockNum }, 'reorg detected');
       throw new ReorgDetectedError();
     }
 
-    await this.handleBlock(block, eventsMap);
+    await this.handleBlock(blockNum, block, eventsMap);
 
-    await this.instance.setBlockHash(blockNum, block.hash);
+    if (block) {
+      await this.instance.setBlockHash(blockNum, block.hash);
+    }
 
-    await this.instance.setLastIndexedBlock(block.number);
+    await this.instance.setLastIndexedBlock(blockNum);
 
     return blockNum + 1;
   }
 
-  private async handleBlock(block: Block, eventsMap: EventsMap) {
-    this.log.info({ blockNumber: block.number }, 'handling block');
+  private async handleBlock(blockNumber: number, block: Block | null, eventsMap: EventsMap) {
+    this.log.info({ blockNumber }, 'handling block');
 
-    const txsToCheck = block.transactions.filter(txId => !this.processedPoolTransactions.has(txId));
+    const blockTransactions = Object.keys(eventsMap);
+    const txsToCheck = blockTransactions.filter(txId => !this.processedPoolTransactions.has(txId));
 
     for (const [i, txId] of txsToCheck.entries()) {
-      await this.handleTx(block, block.number, i, txId, eventsMap[txId] || []);
+      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
     }
 
     this.processedPoolTransactions.clear();
 
-    this.log.debug({ blockNumber: block.number }, 'handling block done');
+    this.log.debug({ blockNumber }, 'handling block done');
   }
 
   private async handleTx(
@@ -245,7 +254,7 @@ export class EvmProvider extends BaseProvider {
     blockHash,
     blockNumber
   }: {
-    blockHash: string;
+    blockHash: string | null;
     blockNumber: number;
   }): Promise<EventsMap> {
     let events: Log[] = [];
@@ -253,6 +262,10 @@ export class EvmProvider extends BaseProvider {
       events = this.logsCache.get(blockNumber) || [];
       this.logsCache.delete(blockNumber);
     } else {
+      if (!blockHash) {
+        throw new Error('Block hash is required to fetch logs from network');
+      }
+
       events = await this._getLogs({
         blockHash
       });
