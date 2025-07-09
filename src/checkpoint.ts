@@ -30,6 +30,7 @@ export default class Checkpoint {
     this.schema = extendSchema(schema);
     this.entityController = new GqlEntityController(this.schema, opts?.overridesConfig);
 
+    this.opts = opts;
     this.log = createLogger({
       base: { component: 'checkpoint' },
       level: opts?.logLevel || LogLevel.Error,

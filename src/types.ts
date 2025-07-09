@@ -31,6 +31,11 @@ export interface CheckpointOptions {
   dbConnection?: string;
   /** Overrides for database types. */
   overridesConfig?: OverridesConfig;
+  /**
+   * Skip fetching blocks from the network.
+   * This can speed up indexing process if you don't need block data.
+   */
+  skipBlockFetching?: boolean;
 }
 
 export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;

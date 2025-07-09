@@ -1,9 +1,10 @@
 import { CheckpointRecord } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
-import { CheckpointConfig, ContractSourceConfig } from '../types';
+import { CheckpointConfig, CheckpointOptions, ContractSourceConfig } from '../types';
 
 export type Instance = {
   config: CheckpointConfig;
+  opts?: CheckpointOptions;
   getCurrentSources(blockNumber: number): ContractSourceConfig[];
   setBlockHash(blockNum: number, hash: string);
   setLastIndexedBlock(blockNum: number);
@@ -91,6 +92,10 @@ export class BaseProvider {
     throw new Error(
       `getCheckpointsRange method was not defined when fetching events from ${fromBlock} to ${toBlock}`
     );
+  }
+
+  handleNewSourceAdded() {
+    throw new Error('handleNewSourceAdded method was not defined');
   }
 }
 
