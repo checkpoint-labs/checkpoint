@@ -439,7 +439,7 @@ export class EvmProvider extends BaseProvider {
   }
 
   handleNewSourceAdded(): void {
-    this.log.info('New source added, clearing logs cache');
+    this.log.info('new source added, clearing logs cache');
     this.logsCache.clear();
   }
 }
