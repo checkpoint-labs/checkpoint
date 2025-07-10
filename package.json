@@ -25,6 +25,7 @@
     "@ethersproject/providers": "^5.7.2",
     "@ethersproject/strings": "^5.7.0",
     "@graphql-tools/schema": "^8.5.1",
+    "@starknet-io/types-js": "^0.7.10",
     "connection-string": "^4.3.5",
     "dataloader": "^2.1.0",
     "express-graphql": "^0.12.0",
