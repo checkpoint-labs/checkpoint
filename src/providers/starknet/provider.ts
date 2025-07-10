@@ -1,10 +1,17 @@
 import { RpcProvider, hash, validateAndParseAddress } from 'starknet';
+import { BlockWithTxReceipts, SPEC } from '@starknet-io/types-js';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
 import { Block, FullBlock, Event, EventsMap, ParsedEvent, isFullBlock, Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
+
+class CustomJsonRpcError extends Error {
+  constructor(message: string, public code: number, public data: any) {
+    super(message);
+  }
+}
 
 export class StarknetProvider extends BaseProvider {
   private readonly provider: RpcProvider;
@@ -101,23 +108,12 @@ export class StarknetProvider extends BaseProvider {
   }
 
   async processPool(blockNumber: number) {
-    const block = await this.provider.getBlockWithTxHashes('pending');
-    const receipts = await Promise.all(
-      block.transactions.map(async txId => {
-        if (this.seenPoolTransactions.has(txId)) {
-          return null;
-        }
+    const block = await this.getBlockWithReceipts('pending');
+    const receipts = block.transactions
+      .map(({ receipt }) => receipt)
+      .filter(receipt => !this.seenPoolTransactions.has(receipt.transaction_hash));
 
-        try {
-          return await this.provider.getTransactionReceipt(txId);
-        } catch (err) {
-          this.log.warn({ transactionHash: txId, err }, 'getting transaction receipt failed');
-          return null;
-        }
-      })
-    );
-
-    const txIds = block.transactions.filter((_, index) => receipts[index] !== null);
+    const txIds = receipts.map(receipt => receipt.transaction_hash);
     const eventsMap = receipts.reduce((acc, receipt) => {
       if (receipt === null) return acc;
 
@@ -277,6 +273,33 @@ export class StarknetProvider extends BaseProvider {
     }
 
     this.log.debug({ txIndex }, 'handling transaction done');
+  }
+
+  private async getBlockWithReceipts(blockId: SPEC.BLOCK_ID) {
+    const res = await fetch(this.instance.config.network_node_url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'starknet_getBlockWithReceipts',
+        params: [blockId]
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+
+    if (json.error) {
+      throw new CustomJsonRpcError(json.error.message, json.error.code, json.error.data);
+    }
+
+    return json.result as BlockWithTxReceipts;
   }
 
   private async getEvents(blockNumber: number): Promise<EventsMap> {
