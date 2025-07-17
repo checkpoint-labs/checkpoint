@@ -8,6 +8,10 @@ import { Knex } from 'knex';
 import { sleep } from './utils/helpers';
 import { register } from './register';
 import { getTableName } from './utils/database';
+import {
+  CheckpointRangeAdapter,
+  CheckpointRangeUtils
+} from './range-optimizer/checkpoint-integration';
 
 const SCHEMA_VERSION = 1;
 
@@ -42,6 +46,10 @@ export class Container implements Instance {
   private preloadedBlocks: number[] = [];
   private preloadEndBlock = 0;
 
+  // Range optimization integration
+  private rangeAdapter: CheckpointRangeAdapter | null = null;
+  private rangeOptimizerEnabled = false;
+
   constructor(
     indexerName: string,
     log: Logger,
@@ -68,6 +76,38 @@ export class Container implements Instance {
       log: this.log,
       abis: config.abis
     });
+
+    // Range optimizer will be initialized in start() method
+  }
+
+  private async initializeRangeOptimizer() {
+    // Range optimizer is enabled by default, but can be disabled via options
+    if (this.opts?.rangeOptimization === false) {
+      this.rangeOptimizerEnabled = false;
+      return;
+    }
+
+    try {
+      const networkId = await this.indexer.getProvider().getNetworkIdentifier();
+      const rangeConfig = CheckpointRangeUtils.getNetworkConfig(networkId);
+
+      // Apply any custom config from options
+      if (this.opts?.rangeOptimizationConfig) {
+        Object.assign(rangeConfig, this.opts.rangeOptimizationConfig);
+      }
+
+      this.rangeAdapter = CheckpointRangeUtils.createAdapter(networkId, rangeConfig);
+      this.rangeOptimizerEnabled = true;
+
+      this.log.info(`Range optimizer initialized for network: ${networkId}`);
+    } catch (error) {
+      this.log.warn(
+        `Failed to initialize range optimizer, falling back to default logic: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      this.rangeOptimizerEnabled = false;
+    }
   }
 
   public get sourceContracts() {
@@ -178,6 +218,13 @@ export class Container implements Instance {
     await this.validateStore();
     await this.indexer.getProvider().init();
 
+    // Initialize range optimizer after provider is ready
+    await this.initializeRangeOptimizer();
+
+    if (this.rangeAdapter) {
+      await this.rangeAdapter.initialize();
+    }
+
     const templateSources = await this.store.getTemplateSources(this.indexerName);
     await Promise.all(
       templateSources.map(source =>
@@ -205,23 +252,51 @@ export class Container implements Instance {
     let currentBlock = blockNum;
 
     while (currentBlock <= this.preloadEndBlock) {
-      const endBlock = Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
+      const endBlock = await this.calculateEndBlock(currentBlock);
       let checkpoints: CheckpointRecord[];
+      const startTime = Date.now();
+
       try {
         this.log.info({ start: currentBlock, end: endBlock }, 'preloading blocks');
         checkpoints = await this.indexer.getProvider().getCheckpointsRange(currentBlock, endBlock);
+
+        // Record successful preload with range optimizer
+        if (this.rangeAdapter) {
+          const responseTime = Date.now() - startTime;
+          this.rangeAdapter.processPreloadResult(
+            currentBlock,
+            endBlock,
+            true,
+            checkpoints.length,
+            undefined,
+            responseTime
+          );
+        }
       } catch (e) {
         this.log.error(
           { blockNumber: currentBlock, err: e },
           'error occurred during checkpoint fetching'
         );
+
+        // Record failed preload with range optimizer
+        if (this.rangeAdapter) {
+          const responseTime = Date.now() - startTime;
+          this.rangeAdapter.processPreloadResult(
+            currentBlock,
+            endBlock,
+            false,
+            0,
+            e as Error,
+            responseTime
+          );
+        }
+
         await sleep(this.config.fetch_interval || DEFAULT_FETCH_INTERVAL);
         continue;
       }
 
-      const increase =
-        checkpoints.length > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
-      this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
+      // Update preload step using optimizer or fallback logic
+      this.updatePreloadStep(checkpoints.length);
 
       if (checkpoints.length > 0) {
         this.preloadedBlocks = [
@@ -234,6 +309,33 @@ export class Container implements Instance {
     }
 
     return null;
+  }
+
+  private async calculateEndBlock(currentBlock: number): Promise<number> {
+    if (this.rangeAdapter && this.rangeOptimizerEnabled) {
+      // Use range optimizer to calculate optimal end block
+      const optimalRange = await this.rangeAdapter.getOptimalPreloadRange(
+        currentBlock,
+        this.preloadEndBlock,
+        0 // We don't have event estimation for preload
+      );
+      return Math.min(currentBlock + optimalRange, this.preloadEndBlock);
+    } else {
+      // Use original logic
+      return Math.min(currentBlock + this.preloadStep, this.preloadEndBlock);
+    }
+  }
+
+  private updatePreloadStep(checkpointCount: number) {
+    if (this.rangeAdapter && this.rangeOptimizerEnabled) {
+      // Range optimizer handles the step calculation
+      return;
+    }
+
+    // Original logic for fallback
+    const increase =
+      checkpointCount > BLOCK_PRELOAD_TARGET ? -BLOCK_PRELOAD_STEP : +BLOCK_PRELOAD_STEP;
+    this.preloadStep = Math.max(BLOCK_RELOAD_MIN_RANGE, this.preloadStep + increase);
   }
 
   private async process(startBlockNumber: number) {
@@ -575,6 +677,47 @@ export class Container implements Instance {
       if (!storedConfigChecksum) {
         await this.store.setMetadata(this.indexerName, MetadataId.ConfigChecksum, configChecksum);
       }
+    }
+  }
+
+  // Range optimizer management methods
+  public getNetworkHealth() {
+    if (this.rangeAdapter) {
+      return this.rangeAdapter.getNetworkHealth();
+    }
+    return null;
+  }
+
+  public enableRangeOptimizer() {
+    if (this.rangeAdapter) {
+      this.rangeAdapter.setEnabled(true);
+      this.rangeOptimizerEnabled = true;
+      this.log.info('Range optimizer enabled');
+    }
+  }
+
+  public disableRangeOptimizer() {
+    if (this.rangeAdapter) {
+      this.rangeAdapter.setEnabled(false);
+      this.rangeOptimizerEnabled = false;
+      this.log.info('Range optimizer disabled');
+    }
+  }
+
+  public resetRangeOptimizer() {
+    if (this.rangeAdapter) {
+      this.rangeAdapter.reset();
+      this.log.info('Range optimizer reset');
+    }
+  }
+
+  public isRangeOptimizerEnabled(): boolean {
+    return this.rangeOptimizerEnabled;
+  }
+
+  public async shutdownRangeOptimizer() {
+    if (this.rangeAdapter) {
+      await this.rangeAdapter.shutdown();
     }
   }
 }

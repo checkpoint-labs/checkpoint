@@ -7,6 +7,7 @@ import {
   overridesConfigSchema
 } from './schemas';
 import { Instance } from './providers';
+import { OptimizationConfig } from './range-optimizer/types';
 
 export type TemplateSource = {
   contractAddress: string;
@@ -36,6 +37,10 @@ export interface CheckpointOptions {
    * This can speed up indexing process if you don't need block data.
    */
   skipBlockFetching?: boolean;
+  /** Enable/disable range optimization. Enabled by default. */
+  rangeOptimization?: boolean;
+  /** Range optimization configuration options. */
+  rangeOptimizationConfig?: Partial<OptimizationConfig>;
 }
 
 export type ContractSourceConfig = z.infer<typeof contractSourceConfigSchema>;
@@ -49,3 +54,6 @@ export type BaseWriterParams = {
   source?: ContractSourceConfig;
   helpers: ReturnType<Instance['getWriterHelpers']>;
 };
+
+// Re-export range optimizer types for convenience
+export * from './range-optimizer/types';
