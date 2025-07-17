@@ -1,15 +1,20 @@
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
-import { getAddress } from '@ethersproject/address';
-import { Formatter, Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
-import { Interface, LogDescription } from '@ethersproject/abi';
-import { keccak256 } from '@ethersproject/keccak256';
-import { toUtf8Bytes } from '@ethersproject/strings';
+import {
+  getAddress,
+  keccak256,
+  createPublicClient,
+  http,
+  Log as ViemLog,
+  Block as ViemBlock,
+  decodeEventLog,
+  stringToHex
+} from 'viem';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, Writer } from './types';
+import { Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
 
-type EventsMap = Record<string, Log[]>;
+type EventsMap = Record<string, ViemLog[]>;
 
 type GetLogsBlockHashFilter = {
   blockHash: string;
@@ -29,16 +34,12 @@ class CustomJsonRpcError extends Error {
 }
 
 export class EvmProvider extends BaseProvider {
-  private readonly provider: Provider;
-  /**
-   * Formatter instance from ethers.js used to format raw responses.
-   */
-  private readonly formatter = new Formatter();
+  private readonly client: any;
   private readonly writers: Record<string, Writer>;
   private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
-  private logsCache = new Map<number, Log[]>();
+  private logsCache = new Map<number, ViemLog[]>();
 
   constructor({
     instance,
@@ -48,7 +49,9 @@ export class EvmProvider extends BaseProvider {
   }: ConstructorParameters<typeof BaseProvider>[0] & { writers: Record<string, Writer> }) {
     super({ instance, log, abis });
 
-    this.provider = new StaticJsonRpcProvider(this.instance.config.network_node_url);
+    this.client = createPublicClient({
+      transport: http(this.instance.config.network_node_url)
+    });
     this.writers = writers;
   }
 
@@ -61,21 +64,22 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getNetworkIdentifier(): Promise<string> {
-    const result = await this.provider.getNetwork();
-    return `evm_${result.chainId}`;
+    const chainId = await this.client.getChainId();
+    return `evm_${chainId}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    return this.provider.getBlockNumber();
+    const blockNumber = await this.client.getBlockNumber();
+    return Number(blockNumber);
   }
 
   async getBlockHash(blockNumber: number) {
-    const block = await this.provider.getBlock(blockNumber);
+    const block = await this.client.getBlock({ blockNumber: BigInt(blockNumber) });
     return block.hash;
   }
 
   async processBlock(blockNum: number, parentHash: string | null) {
-    let block: Block | null = null;
+    let block: ViemBlock | null = null;
     let eventsMap: EventsMap;
 
     const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
@@ -83,7 +87,7 @@ export class EvmProvider extends BaseProvider {
 
     try {
       if (!hasPreloadedBlockEvents) {
-        block = await this.provider.getBlock(blockNum);
+        block = await this.client.getBlock({ blockNumber: BigInt(blockNum) });
       }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
@@ -98,7 +102,7 @@ export class EvmProvider extends BaseProvider {
     try {
       eventsMap = await this.getEvents({
         blockNumber: blockNum,
-        blockHash: block?.hash ?? null
+        blockHash: block?.hash ?? ''
       });
     } catch (e: unknown) {
       if (e instanceof CustomJsonRpcError && e.code === -32000) {
@@ -118,7 +122,7 @@ export class EvmProvider extends BaseProvider {
     await this.handleBlock(blockNum, block, eventsMap);
 
     if (block) {
-      await this.instance.setBlockHash(blockNum, block.hash);
+      await this.instance.setBlockHash(blockNum, block.hash || '');
     }
 
     await this.instance.setLastIndexedBlock(blockNum);
@@ -126,7 +130,7 @@ export class EvmProvider extends BaseProvider {
     return blockNum + 1;
   }
 
-  private async handleBlock(blockNumber: number, block: Block | null, eventsMap: EventsMap) {
+  private async handleBlock(blockNumber: number, block: ViemBlock | null, eventsMap: EventsMap) {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsMap);
@@ -142,11 +146,11 @@ export class EvmProvider extends BaseProvider {
   }
 
   private async handleTx(
-    block: Block | null,
+    block: ViemBlock | null,
     blockNumber: number,
     txIndex: number,
     txId: string,
-    logs: Log[]
+    logs: ViemLog[]
   ) {
     this.log.debug({ txIndex }, 'handling transaction');
 
@@ -171,7 +175,7 @@ export class EvmProvider extends BaseProvider {
       }, {});
 
       for (const [eventIndex, event] of logs.entries()) {
-        const handler = globalEventHandlers[event.topics[0]];
+        const handler = globalEventHandlers[event.topics[0] as string];
         if (!handler) continue;
 
         this.log.info(
@@ -208,11 +212,19 @@ export class EvmProvider extends BaseProvider {
                 'found contract event'
               );
 
-              let parsedEvent: LogDescription | undefined;
+              let parsedEvent: any | undefined;
               if (source.abi && this.abis?.[source.abi]) {
-                const iface = new Interface(this.abis[source.abi]);
                 try {
-                  parsedEvent = iface.parseLog(log);
+                  const eventAbi = this.abis[source.abi].find(
+                    (item: any) => item.type === 'event' && item.name === sourceEvent.name
+                  );
+                  if (eventAbi) {
+                    parsedEvent = decodeEventLog({
+                      abi: [eventAbi],
+                      data: log.data as `0x${string}`,
+                      topics: log.topics as [`0x${string}`, ...`0x${string}`[]]
+                    });
+                  }
                 } catch (err) {
                   this.log.warn(
                     { contract: source.contract, txId, handlerFn: sourceEvent.fn },
@@ -257,12 +269,12 @@ export class EvmProvider extends BaseProvider {
     blockHash: string | null;
     blockNumber: number;
   }): Promise<EventsMap> {
-    let events: Log[] = [];
+    let events: ViemLog[] = [];
     if (this.logsCache.has(blockNumber)) {
       events = this.logsCache.get(blockNumber) || [];
       this.logsCache.delete(blockNumber);
     } else {
-      if (!blockHash) {
+      if (!blockHash || blockHash === '') {
         throw new Error('Block hash is required to fetch logs from network');
       }
 
@@ -272,12 +284,13 @@ export class EvmProvider extends BaseProvider {
     }
 
     return events.reduce((acc, event) => {
-      if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
+      const txHash = event.transactionHash || '';
+      if (!acc[txHash]) acc[txHash] = [];
 
-      acc[event.transactionHash] = acc[event.transactionHash].concat(event);
+      acc[txHash] = acc[txHash].concat(event);
 
       return acc;
-    }, {});
+    }, {} as EventsMap);
   }
 
   /**
@@ -292,7 +305,7 @@ export class EvmProvider extends BaseProvider {
       address?: string | string[];
       topics?: (string | string[])[];
     }
-  ): Promise<Log[]> {
+  ): Promise<ViemLog[]> {
     const params: {
       fromBlock?: string;
       toBlock?: string;
@@ -344,7 +357,17 @@ export class EvmProvider extends BaseProvider {
       throw new CustomJsonRpcError(json.error.message, json.error.code, json.error.data);
     }
 
-    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(json.result);
+    return json.result.map((log: any) => ({
+      address: log.address,
+      topics: log.topics,
+      data: log.data,
+      blockNumber: parseInt(log.blockNumber, 16),
+      transactionHash: log.transactionHash,
+      transactionIndex: parseInt(log.transactionIndex, 16),
+      blockHash: log.blockHash,
+      logIndex: parseInt(log.logIndex, 16),
+      removed: log.removed
+    }));
   }
 
   async getLogs(
@@ -352,8 +375,8 @@ export class EvmProvider extends BaseProvider {
     toBlock: number,
     address: string | string[],
     topics: (string | string[])[] = []
-  ): Promise<Log[]> {
-    let result = [] as Log[];
+  ): Promise<ViemLog[]> {
+    let result = [] as ViemLog[];
 
     let currentFrom = fromBlock;
     let currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
@@ -401,7 +424,7 @@ export class EvmProvider extends BaseProvider {
       chunks.push(sources.slice(i, i + 20));
     }
 
-    let events: Log[] = [];
+    let events: ViemLog[] = [];
     for (const chunk of chunks) {
       const address = chunk.map(source => source.contract);
       const topics = chunk.flatMap(source =>
@@ -413,22 +436,23 @@ export class EvmProvider extends BaseProvider {
     }
 
     for (const log of events) {
-      if (!this.logsCache.has(log.blockNumber)) {
-        this.logsCache.set(log.blockNumber, []);
+      const blockNumber = Number(log.blockNumber);
+      if (!this.logsCache.has(blockNumber)) {
+        this.logsCache.set(blockNumber, []);
       }
 
-      this.logsCache.get(log.blockNumber)?.push(log);
+      this.logsCache.get(blockNumber)?.push(log);
     }
 
     return events.map(log => ({
-      blockNumber: log.blockNumber,
+      blockNumber: Number(log.blockNumber),
       contractAddress: log.address
     }));
   }
 
   getEventHash(eventName: string) {
     if (!this.sourceHashes.has(eventName)) {
-      this.sourceHashes.set(eventName, keccak256(toUtf8Bytes(eventName)));
+      this.sourceHashes.set(eventName, keccak256(stringToHex(eventName)));
     }
 
     return this.sourceHashes.get(eventName) as string;

@@ -9,7 +9,8 @@
     "noImplicitAny": false,
     "resolveJsonModule": true,
     "moduleResolution": "Node",
-    "declaration": true
+    "declaration": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

@@ -1,14 +1,11 @@
-import { Provider, Log } from '@ethersproject/providers';
-import { LogDescription } from '@ethersproject/abi';
+import { Log, Block } from 'viem';
 import { BaseWriterParams } from '../../types';
-
-export type Block = Awaited<ReturnType<Provider['getBlock']>>;
 
 export type Writer = (
   args: {
     txId: string;
     block: Block | null;
     rawEvent?: Log;
-    event?: LogDescription;
+    event?: any;
   } & BaseWriterParams
 ) => Promise<void>;
