@@ -2,9 +2,7 @@
   "name": "@snapshot-labs/checkpoint",
   "version": "0.1.0-beta.62",
   "license": "MIT",
-  "bin": {
-    "checkpoint": "dist/src/bin/index.js"
-  },
+  "bin": "dist/src/bin/index.js",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
@@ -19,11 +17,6 @@
   },
   "prettier": "@snapshot-labs/prettier-config",
   "dependencies": {
-    "@ethersproject/abi": "^5.7.0",
-    "@ethersproject/address": "^5.7.0",
-    "@ethersproject/keccak256": "^5.7.0",
-    "@ethersproject/providers": "^5.7.2",
-    "@ethersproject/strings": "^5.7.0",
     "@graphql-tools/schema": "^8.5.1",
     "@starknet-io/types-js": "^0.7.10",
     "connection-string": "^4.3.5",
@@ -40,6 +33,7 @@
     "pino-pretty": "^8.1.0",
     "pluralize": "^8.0.0",
     "starknet": "~5.19.3",
+    "viem": "^2.32.0",
     "yargs": "^17.7.2",
     "zod": "^3.21.4"
   },
