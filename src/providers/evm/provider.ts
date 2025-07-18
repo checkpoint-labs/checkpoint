@@ -232,8 +232,14 @@ export class EvmProvider extends BaseProvider {
         ]);
 
         const nextSources = this.instance.getCurrentSources(blockNumber);
+        const hasNewSources = nextSources.length > lastSources.length;
+
         sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
         lastSources = this.instance.getCurrentSources(blockNumber);
+
+        if (hasNewSources) {
+          this.handleNewSourceAdded();
+        }
       }
     }
 

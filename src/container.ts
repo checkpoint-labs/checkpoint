@@ -111,7 +111,6 @@ export class Container implements Instance {
 
     this.config.sources.push(source);
     this.cpBlocksCache = [];
-    this.indexer.getProvider().handleNewSourceAdded();
   }
 
   public async executeTemplate(
