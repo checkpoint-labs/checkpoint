@@ -130,21 +130,15 @@ export class EvmProvider extends BaseProvider {
 
     const blockTransactions = Object.keys(eventsMap);
 
-    for (const [i, txId] of blockTransactions.entries()) {
-      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of blockTransactions) {
+      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
     }
 
     this.log.debug({ blockNumber }, 'handling block done');
   }
 
-  private async handleTx(
-    block: Block | null,
-    blockNumber: number,
-    txIndex: number,
-    txId: string,
-    logs: Log[]
-  ) {
-    this.log.debug({ txIndex }, 'handling transaction');
+  private async handleTx(block: Block | null, blockNumber: number, txId: string, logs: Log[]) {
+    this.log.debug({ txId }, 'handling transaction');
 
     const helpers = await this.instance.getWriterHelpers();
 
@@ -243,7 +237,7 @@ export class EvmProvider extends BaseProvider {
       }
     }
 
-    this.log.debug({ txIndex }, 'handling transaction done');
+    this.log.debug({ txId }, 'handling transaction done');
   }
 
   private async getEvents({

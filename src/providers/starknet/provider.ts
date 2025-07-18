@@ -124,14 +124,14 @@ export class StarknetProvider extends BaseProvider {
     await this.handlePool(txIds, eventsMap, blockNumber);
   }
 
-  private async handleBlock(blockNumber, block: FullBlock | null, eventsMap: EventsMap) {
+  private async handleBlock(blockNumber: number, block: FullBlock | null, eventsMap: EventsMap) {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsMap);
     const txsToCheck = blockTransactions.filter(txId => !this.seenPoolTransactions.has(txId));
 
-    for (const [i, txId] of txsToCheck.entries()) {
-      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of txsToCheck) {
+      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
     }
 
     this.seenPoolTransactions.clear();
@@ -142,8 +142,8 @@ export class StarknetProvider extends BaseProvider {
   private async handlePool(txIds: string[], eventsMap: EventsMap, blockNumber: number) {
     this.log.info('handling pool');
 
-    for (const [i, txId] of txIds.entries()) {
-      await this.handleTx(null, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of txIds) {
+      await this.handleTx(null, blockNumber, txId, eventsMap[txId] || []);
 
       this.seenPoolTransactions.add(txId);
     }
@@ -154,11 +154,10 @@ export class StarknetProvider extends BaseProvider {
   private async handleTx(
     block: FullBlock | null,
     blockNumber: number,
-    txIndex: number,
     txId: string,
     events: Event[]
   ) {
-    this.log.debug({ txIndex }, 'handling transaction');
+    this.log.debug({ txId }, 'handling transaction');
 
     if (this.processedTransactions.has(txId)) {
       this.log.warn({ hash: txId }, 'transaction already processed');
@@ -272,7 +271,7 @@ export class StarknetProvider extends BaseProvider {
       }
     }
 
-    this.log.debug({ txIndex }, 'handling transaction done');
+    this.log.debug({ txId }, 'handling transaction done');
   }
 
   private async getBlockWithReceipts(blockId: SPEC.BLOCK_ID) {
