@@ -19,11 +19,7 @@
   },
   "prettier": "@snapshot-labs/prettier-config",
   "dependencies": {
-    "@ethersproject/abi": "^5.7.0",
-    "@ethersproject/address": "^5.7.0",
-    "@ethersproject/keccak256": "^5.7.0",
-    "@ethersproject/providers": "^5.7.2",
-    "@ethersproject/strings": "^5.7.0",
+    "viem": "^2.32.0",
     "@graphql-tools/schema": "^8.5.1",
     "@starknet-io/types-js": "^0.7.10",
     "connection-string": "^4.3.5",
@@ -48,7 +44,7 @@
     "@snapshot-labs/prettier-config": "^0.1.0-beta.7",
     "@types/bn.js": "^5.1.0",
     "@types/jest": "^29.5.0",
-    "@types/node": "^18.11.6",
+    "@types/node": "^20.0.0",
     "@types/pg": "^8.6.6",
     "dotenv": "^16.0.1",
     "eslint": "^8.28.0",
@@ -58,7 +54,7 @@
     "sqlite3": "^5.1.6",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.1",
-    "typescript": "^4.9.3"
+    "typescript": "^5.0.0"
   },
   "files": [
     "dist/**/*",
