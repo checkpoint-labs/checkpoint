@@ -45,7 +45,6 @@ export type OverridesConfig = z.infer<typeof overridesConfigSchema>;
 
 export type BaseWriterParams = {
   blockNumber: number;
-  eventIndex?: number;
   source?: ContractSourceConfig;
   helpers: ReturnType<Instance['getWriterHelpers']>;
 };

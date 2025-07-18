@@ -187,7 +187,7 @@ export class StarknetProvider extends BaseProvider {
         return handlers;
       }, {});
 
-      for (const [eventIndex, event] of events.entries()) {
+      for (const event of events) {
         const handler = globalEventHandlers[event.keys[0]];
         if (!handler) continue;
 
@@ -201,7 +201,6 @@ export class StarknetProvider extends BaseProvider {
           blockNumber,
           txId,
           rawEvent: event,
-          eventIndex,
           helpers
         });
 
@@ -217,7 +216,7 @@ export class StarknetProvider extends BaseProvider {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
-      for (const [eventIndex, event] of events.entries()) {
+      for (const event of events) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (this.getEventHash(sourceEvent.name) === event.keys[0]) {
@@ -246,7 +245,6 @@ export class StarknetProvider extends BaseProvider {
                 txId,
                 rawEvent: event,
                 event: parsedEvent,
-                eventIndex,
                 helpers
               });
 

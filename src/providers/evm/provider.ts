@@ -160,7 +160,7 @@ export class EvmProvider extends BaseProvider {
         return handlers;
       }, {});
 
-      for (const [eventIndex, event] of logs.entries()) {
+      for (const event of logs) {
         const handler = globalEventHandlers[event.topics[0]];
         if (!handler) continue;
 
@@ -174,7 +174,6 @@ export class EvmProvider extends BaseProvider {
           blockNumber,
           txId,
           rawEvent: event,
-          eventIndex,
           helpers
         });
       }
@@ -186,7 +185,7 @@ export class EvmProvider extends BaseProvider {
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
       let foundContractData = false;
-      for (const [eventIndex, log] of logs.entries()) {
+      for (const log of logs) {
         if (this.compareAddress(source.contract, log.address)) {
           for (const sourceEvent of source.events) {
             const targetTopic = this.getEventHash(sourceEvent.name);
@@ -218,7 +217,6 @@ export class EvmProvider extends BaseProvider {
                 txId,
                 rawEvent: log,
                 event: parsedEvent,
-                eventIndex,
                 helpers
               });
             }
