@@ -35,7 +35,6 @@ export class EvmProvider extends BaseProvider {
    */
   private readonly formatter = new Formatter();
   private readonly writers: Record<string, Writer>;
-  private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
   private logsCache = new Map<number, Log[]>();
@@ -130,13 +129,10 @@ export class EvmProvider extends BaseProvider {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsMap);
-    const txsToCheck = blockTransactions.filter(txId => !this.processedPoolTransactions.has(txId));
 
-    for (const [i, txId] of txsToCheck.entries()) {
+    for (const [i, txId] of blockTransactions.entries()) {
       await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
     }
-
-    this.processedPoolTransactions.clear();
 
     this.log.debug({ blockNumber }, 'handling block done');
   }
