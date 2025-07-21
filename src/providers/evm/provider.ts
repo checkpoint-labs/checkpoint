@@ -1,11 +1,16 @@
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
-import { getAddress } from '@ethersproject/address';
-import { Formatter, Log, Provider, StaticJsonRpcProvider } from '@ethersproject/providers';
-import { Interface, LogDescription } from '@ethersproject/abi';
-import { keccak256 } from '@ethersproject/keccak256';
-import { toUtf8Bytes } from '@ethersproject/strings';
+import {
+  createPublicClient,
+  http,
+  PublicClient,
+  decodeEventLog,
+  DecodeEventLogReturnType,
+  formatLog,
+  RpcRequestError
+} from 'viem';
+import { getAddress, keccak256, toBytes } from 'viem/utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, Writer } from './types';
+import { Block, Writer, Log } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
 
@@ -22,18 +27,8 @@ type GetLogsBlockRangeFilter = {
 
 const MAX_BLOCKS_PER_REQUEST = 10000;
 
-class CustomJsonRpcError extends Error {
-  constructor(message: string, public code: number, public data: any) {
-    super(message);
-  }
-}
-
 export class EvmProvider extends BaseProvider {
-  private readonly provider: Provider;
-  /**
-   * Formatter instance from ethers.js used to format raw responses.
-   */
-  private readonly formatter = new Formatter();
+  private readonly client: PublicClient;
   private readonly writers: Record<string, Writer>;
   private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
@@ -48,7 +43,9 @@ export class EvmProvider extends BaseProvider {
   }: ConstructorParameters<typeof BaseProvider>[0] & { writers: Record<string, Writer> }) {
     super({ instance, log, abis });
 
-    this.provider = new StaticJsonRpcProvider(this.instance.config.network_node_url);
+    this.client = createPublicClient({
+      transport: http(this.instance.config.network_node_url)
+    });
     this.writers = writers;
   }
 
@@ -61,16 +58,17 @@ export class EvmProvider extends BaseProvider {
   }
 
   async getNetworkIdentifier(): Promise<string> {
-    const result = await this.provider.getNetwork();
-    return `evm_${result.chainId}`;
+    const chainId = await this.client.getChainId();
+    return `evm_${chainId}`;
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    return this.provider.getBlockNumber();
+    const num = await this.client.getBlockNumber();
+    return Number(num);
   }
 
   async getBlockHash(blockNumber: number) {
-    const block = await this.provider.getBlock(blockNumber);
+    const block = await this.client.getBlock({ blockNumber: BigInt(blockNumber) });
     return block.hash;
   }
 
@@ -83,7 +81,7 @@ export class EvmProvider extends BaseProvider {
 
     try {
       if (!hasPreloadedBlockEvents) {
-        block = await this.provider.getBlock(blockNum);
+        block = await this.client.getBlock({ blockNumber: BigInt(blockNum) });
       }
     } catch (e) {
       this.log.error({ blockNumber: blockNum, err: e }, 'getting block failed... retrying');
@@ -101,7 +99,7 @@ export class EvmProvider extends BaseProvider {
         blockHash: block?.hash ?? null
       });
     } catch (e: unknown) {
-      if (e instanceof CustomJsonRpcError && e.code === -32000) {
+      if (e instanceof RpcRequestError && e.code === -32000) {
         this.log.info({ blockNumber: blockNum }, 'block events not found');
         throw new BlockNotFoundError();
       }
@@ -208,11 +206,14 @@ export class EvmProvider extends BaseProvider {
                 'found contract event'
               );
 
-              let parsedEvent: LogDescription | undefined;
+              let parsedEvent: DecodeEventLogReturnType | undefined;
               if (source.abi && this.abis?.[source.abi]) {
-                const iface = new Interface(this.abis[source.abi]);
                 try {
-                  parsedEvent = iface.parseLog(log);
+                  parsedEvent = decodeEventLog({
+                    abi: this.abis[source.abi],
+                    data: log.data,
+                    topics: log.topics as [string, ...string[]]
+                  });
                 } catch (err) {
                   this.log.warn(
                     { contract: source.contract, txId, handlerFn: sourceEvent.fn },
@@ -294,8 +295,8 @@ export class EvmProvider extends BaseProvider {
     }
   ): Promise<Log[]> {
     const params: {
-      fromBlock?: string;
-      toBlock?: string;
+      fromBlock?: bigint;
+      toBlock?: bigint;
       blockHash?: string;
       address?: string | string[];
       topics?: (string | string[])[];
@@ -306,11 +307,11 @@ export class EvmProvider extends BaseProvider {
     }
 
     if ('fromBlock' in filter) {
-      params.fromBlock = `0x${filter.fromBlock.toString(16)}`;
+      params.fromBlock = BigInt(filter.fromBlock);
     }
 
     if ('toBlock' in filter) {
-      params.toBlock = `0x${filter.toBlock.toString(16)}`;
+      params.toBlock = BigInt(filter.toBlock);
     }
 
     if ('address' in filter) {
@@ -321,30 +322,15 @@ export class EvmProvider extends BaseProvider {
       params.topics = filter.topics;
     }
 
-    const res = await fetch(this.instance.config.network_node_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_getLogs',
-        params: [params]
-      })
+    const logs = await this.client.getLogs(params);
+
+    return logs.map(log => {
+      const formatted = formatLog(log);
+      return {
+        ...formatted,
+        blockNumber: formatted.blockNumber ? Number(formatted.blockNumber) : null
+      } as Log;
     });
-
-    if (!res.ok) {
-      throw new Error(`Request failed: ${res.statusText}`);
-    }
-
-    const json = await res.json();
-
-    if (json.error) {
-      throw new CustomJsonRpcError(json.error.message, json.error.code, json.error.data);
-    }
-
-    return Formatter.arrayOf(this.formatter.filterLog.bind(this.formatter))(json.result);
   }
 
   async getLogs(
@@ -373,10 +359,13 @@ export class EvmProvider extends BaseProvider {
         currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
       } catch (e: unknown) {
         // Handle Infura response size hint
-        if (e instanceof CustomJsonRpcError) {
-          if (e.code === -32005) {
-            currentFrom = parseInt(e.data.from, 16);
-            currentTo = Math.min(parseInt(e.data.to, 16), currentFrom + MAX_BLOCKS_PER_REQUEST);
+        if (e instanceof RpcRequestError) {
+          if (e.code === -32005 && typeof e.data === 'object' && e.data) {
+            currentFrom = parseInt((e.data as any).from, 16);
+            currentTo = Math.min(
+              parseInt((e.data as any).to, 16),
+              currentFrom + MAX_BLOCKS_PER_REQUEST
+            );
             continue;
           }
         }
@@ -428,7 +417,7 @@ export class EvmProvider extends BaseProvider {
 
   getEventHash(eventName: string) {
     if (!this.sourceHashes.has(eventName)) {
-      this.sourceHashes.set(eventName, keccak256(toUtf8Bytes(eventName)));
+      this.sourceHashes.set(eventName, keccak256(toBytes(eventName)));
     }
 
     return this.sourceHashes.get(eventName) as string;
