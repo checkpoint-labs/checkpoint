@@ -35,7 +35,6 @@ export class EvmProvider extends BaseProvider {
    */
   private readonly formatter = new Formatter();
   private readonly writers: Record<string, Writer>;
-  private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
   private logsCache = new Map<number, Log[]>();
 
@@ -53,10 +52,6 @@ export class EvmProvider extends BaseProvider {
 
   formatAddresses(addresses: string[]): string[] {
     return addresses.map(address => getAddress(address));
-  }
-
-  public async init() {
-    this.startupLatestBlockNumber = await this.getLatestBlockNumber();
   }
 
   async getNetworkIdentifier(): Promise<string> {

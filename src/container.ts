@@ -176,7 +176,6 @@ export class Container implements Instance {
    */
   public async start() {
     await this.validateStore();
-    await this.indexer.getProvider().init();
 
     const templateSources = await this.store.getTemplateSources(this.indexerName);
     await Promise.all(
