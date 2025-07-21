@@ -230,13 +230,26 @@ export class EvmProvider extends BaseProvider {
         ]);
 
         const nextSources = this.instance.getCurrentSources(blockNumber);
-        const hasNewSources = nextSources.length > lastSources.length;
+        const newSources = nextSources.slice(lastSources.length);
 
-        sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+        sourcesQueue = sourcesQueue.concat(newSources);
         lastSources = this.instance.getCurrentSources(blockNumber);
 
-        if (hasNewSources) {
+        if (newSources.length) {
           this.handleNewSourceAdded();
+
+          this.log.info(
+            { newSources: newSources.map(s => s.contract) },
+            'new sources added, fetching missing logs'
+          );
+
+          const newSourcesLogs = await this.getLogsForSources({
+            fromBlock: blockNumber,
+            toBlock: blockNumber,
+            sources: newSources
+          });
+
+          logs = logs.concat(newSourcesLogs);
         }
       }
     }
@@ -387,9 +400,15 @@ export class EvmProvider extends BaseProvider {
     return result;
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const sources = this.instance.getCurrentSources(fromBlock);
-
+  async getLogsForSources({
+    fromBlock,
+    toBlock,
+    sources
+  }: {
+    fromBlock: number;
+    toBlock: number;
+    sources: ContractSourceConfig[];
+  }): Promise<Log[]> {
     const chunks: ContractSourceConfig[][] = [];
     for (let i = 0; i < sources.length; i += 20) {
       chunks.push(sources.slice(i, i + 20));
@@ -405,6 +424,16 @@ export class EvmProvider extends BaseProvider {
       const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [topics]);
       events = events.concat(chunkEvents);
     }
+
+    return events;
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events = await this.getLogsForSources({
+      fromBlock,
+      toBlock,
+      sources: this.instance.getCurrentSources(fromBlock)
+    });
 
     for (const log of events) {
       if (!this.logsCache.has(log.blockNumber)) {
