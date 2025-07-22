@@ -18,7 +18,6 @@ export class StarknetProvider extends BaseProvider {
   private readonly writers: Record<string, Writer>;
   private seenPoolTransactions = new Set();
   private processedTransactions = new Set();
-  private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
   private logsCache = new Map<number, Event[]>();
 
@@ -36,10 +35,6 @@ export class StarknetProvider extends BaseProvider {
       nodeUrl: this.instance.config.network_node_url
     });
     this.writers = writers;
-  }
-
-  public async init() {
-    this.startupLatestBlockNumber = await this.getLatestBlockNumber();
   }
 
   formatAddresses(addresses: string[]): string[] {
@@ -67,15 +62,19 @@ export class StarknetProvider extends BaseProvider {
       const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
       const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
 
-      if (hasPreloadedBlockEvents) {
-        block = null;
-        blockEvents = await this.getEvents(blockNum);
-      } else {
-        [block, blockEvents] = await Promise.all([
-          this.provider.getBlockWithTxHashes(blockNum),
-          this.getEvents(blockNum)
-        ]);
+      if (!hasPreloadedBlockEvents) {
+        block = await this.provider.getBlockWithTxHashes(blockNum);
       }
+
+      if (block && (!isFullBlock(block) || block.block_number !== blockNum)) {
+        this.log.error({ blockNumber: blockNum }, 'invalid block');
+        throw new Error('invalid block');
+      }
+
+      blockEvents = await this.getEvents({
+        blockNumber: blockNum,
+        blockHash: block?.block_hash ?? null
+      });
     } catch (e) {
       if ((e as Error).message.includes('Block not found')) {
         this.log.info({ blockNumber: blockNum }, 'block not found');
@@ -89,11 +88,6 @@ export class StarknetProvider extends BaseProvider {
     if (block && parentHash && block.parent_hash !== parentHash) {
       this.log.error({ blockNumber: blockNum }, 'reorg detected');
       throw new ReorgDetectedError();
-    }
-
-    if (block && (!isFullBlock(block) || block.block_number !== blockNum)) {
-      this.log.error({ blockNumber: blockNum }, 'invalid block');
-      throw new Error('invalid block');
     }
 
     await this.handleBlock(blockNum, block, blockEvents);
@@ -318,18 +312,28 @@ export class StarknetProvider extends BaseProvider {
     return json.result as BlockWithTxReceipts;
   }
 
-  private async getEvents(blockNumber: number): Promise<EventsMap> {
+  private async getEvents({
+    blockHash,
+    blockNumber
+  }: {
+    blockHash: string | null;
+    blockNumber: number;
+  }): Promise<EventsMap> {
     let events: Event[] = [];
 
     if (this.logsCache.has(blockNumber)) {
       events = this.logsCache.get(blockNumber) || [];
       this.logsCache.delete(blockNumber);
     } else {
+      if (!blockHash) {
+        throw new Error('Block hash is required to fetch logs from network');
+      }
+
       let continuationToken: string | undefined;
       do {
         const result = await this.provider.getEvents({
-          from_block: { block_number: blockNumber },
-          to_block: { block_number: blockNumber },
+          from_block: { block_hash: blockHash },
+          to_block: { block_hash: blockHash },
           chunk_size: 1000,
           continuation_token: continuationToken
         });
@@ -338,14 +342,6 @@ export class StarknetProvider extends BaseProvider {
 
         continuationToken = result.continuation_token;
       } while (continuationToken);
-    }
-
-    if (
-      events.length === 0 &&
-      this.startupLatestBlockNumber &&
-      blockNumber > this.startupLatestBlockNumber
-    ) {
-      throw new BlockNotFoundError();
     }
 
     return events.reduce((acc, event) => {
