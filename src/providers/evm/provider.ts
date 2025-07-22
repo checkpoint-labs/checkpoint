@@ -35,7 +35,6 @@ export class EvmProvider extends BaseProvider {
    */
   private readonly formatter = new Formatter();
   private readonly writers: Record<string, Writer>;
-  private processedPoolTransactions = new Set();
   private startupLatestBlockNumber: number | undefined;
   private sourceHashes = new Map<string, string>();
   private logsCache = new Map<number, Log[]>();
@@ -130,25 +129,16 @@ export class EvmProvider extends BaseProvider {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsMap);
-    const txsToCheck = blockTransactions.filter(txId => !this.processedPoolTransactions.has(txId));
 
-    for (const [i, txId] of txsToCheck.entries()) {
-      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of blockTransactions) {
+      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
     }
-
-    this.processedPoolTransactions.clear();
 
     this.log.debug({ blockNumber }, 'handling block done');
   }
 
-  private async handleTx(
-    block: Block | null,
-    blockNumber: number,
-    txIndex: number,
-    txId: string,
-    logs: Log[]
-  ) {
-    this.log.debug({ txIndex }, 'handling transaction');
+  private async handleTx(block: Block | null, blockNumber: number, txId: string, logs: Log[]) {
+    this.log.debug({ txId }, 'handling transaction');
 
     const helpers = await this.instance.getWriterHelpers();
 
@@ -170,7 +160,7 @@ export class EvmProvider extends BaseProvider {
         return handlers;
       }, {});
 
-      for (const [eventIndex, event] of logs.entries()) {
+      for (const event of logs) {
         const handler = globalEventHandlers[event.topics[0]];
         if (!handler) continue;
 
@@ -184,7 +174,6 @@ export class EvmProvider extends BaseProvider {
           blockNumber,
           txId,
           rawEvent: event,
-          eventIndex,
           helpers
         });
       }
@@ -196,7 +185,7 @@ export class EvmProvider extends BaseProvider {
     let source: ContractSourceConfig | undefined;
     while ((source = sourcesQueue.shift())) {
       let foundContractData = false;
-      for (const [eventIndex, log] of logs.entries()) {
+      for (const log of logs) {
         if (this.compareAddress(source.contract, log.address)) {
           for (const sourceEvent of source.events) {
             const targetTopic = this.getEventHash(sourceEvent.name);
@@ -228,7 +217,6 @@ export class EvmProvider extends BaseProvider {
                 txId,
                 rawEvent: log,
                 event: parsedEvent,
-                eventIndex,
                 helpers
               });
             }
@@ -242,12 +230,31 @@ export class EvmProvider extends BaseProvider {
         ]);
 
         const nextSources = this.instance.getCurrentSources(blockNumber);
-        sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+        const newSources = nextSources.slice(lastSources.length);
+
+        sourcesQueue = sourcesQueue.concat(newSources);
         lastSources = this.instance.getCurrentSources(blockNumber);
+
+        if (newSources.length) {
+          this.handleNewSourceAdded();
+
+          this.log.info(
+            { newSources: newSources.map(s => s.contract) },
+            'new sources added, fetching missing logs'
+          );
+
+          const newSourcesLogs = await this.getLogsForSources({
+            fromBlock: blockNumber,
+            toBlock: blockNumber,
+            sources: newSources
+          });
+
+          logs = logs.concat(newSourcesLogs);
+        }
       }
     }
 
-    this.log.debug({ txIndex }, 'handling transaction done');
+    this.log.debug({ txId }, 'handling transaction done');
   }
 
   private async getEvents({
@@ -393,9 +400,15 @@ export class EvmProvider extends BaseProvider {
     return result;
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
-    const sources = this.instance.getCurrentSources(fromBlock);
-
+  async getLogsForSources({
+    fromBlock,
+    toBlock,
+    sources
+  }: {
+    fromBlock: number;
+    toBlock: number;
+    sources: ContractSourceConfig[];
+  }): Promise<Log[]> {
     const chunks: ContractSourceConfig[][] = [];
     for (let i = 0; i < sources.length; i += 20) {
       chunks.push(sources.slice(i, i + 20));
@@ -411,6 +424,16 @@ export class EvmProvider extends BaseProvider {
       const chunkEvents = await this.getLogs(fromBlock, toBlock, address, [topics]);
       events = events.concat(chunkEvents);
     }
+
+    return events;
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events = await this.getLogsForSources({
+      fromBlock,
+      toBlock,
+      sources: this.instance.getCurrentSources(fromBlock)
+    });
 
     for (const log of events) {
       if (!this.logsCache.has(log.blockNumber)) {

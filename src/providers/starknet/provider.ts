@@ -124,14 +124,14 @@ export class StarknetProvider extends BaseProvider {
     await this.handlePool(txIds, eventsMap, blockNumber);
   }
 
-  private async handleBlock(blockNumber, block: FullBlock | null, eventsMap: EventsMap) {
+  private async handleBlock(blockNumber: number, block: FullBlock | null, eventsMap: EventsMap) {
     this.log.info({ blockNumber }, 'handling block');
 
     const blockTransactions = Object.keys(eventsMap);
     const txsToCheck = blockTransactions.filter(txId => !this.seenPoolTransactions.has(txId));
 
-    for (const [i, txId] of txsToCheck.entries()) {
-      await this.handleTx(block, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of txsToCheck) {
+      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
     }
 
     this.seenPoolTransactions.clear();
@@ -142,8 +142,8 @@ export class StarknetProvider extends BaseProvider {
   private async handlePool(txIds: string[], eventsMap: EventsMap, blockNumber: number) {
     this.log.info('handling pool');
 
-    for (const [i, txId] of txIds.entries()) {
-      await this.handleTx(null, blockNumber, i, txId, eventsMap[txId] || []);
+    for (const txId of txIds) {
+      await this.handleTx(null, blockNumber, txId, eventsMap[txId] || []);
 
       this.seenPoolTransactions.add(txId);
     }
@@ -154,11 +154,10 @@ export class StarknetProvider extends BaseProvider {
   private async handleTx(
     block: FullBlock | null,
     blockNumber: number,
-    txIndex: number,
     txId: string,
     events: Event[]
   ) {
-    this.log.debug({ txIndex }, 'handling transaction');
+    this.log.debug({ txId }, 'handling transaction');
 
     if (this.processedTransactions.has(txId)) {
       this.log.warn({ hash: txId }, 'transaction already processed');
@@ -188,7 +187,7 @@ export class StarknetProvider extends BaseProvider {
         return handlers;
       }, {});
 
-      for (const [eventIndex, event] of events.entries()) {
+      for (const event of events) {
         const handler = globalEventHandlers[event.keys[0]];
         if (!handler) continue;
 
@@ -202,7 +201,6 @@ export class StarknetProvider extends BaseProvider {
           blockNumber,
           txId,
           rawEvent: event,
-          eventIndex,
           helpers
         });
 
@@ -218,7 +216,7 @@ export class StarknetProvider extends BaseProvider {
       let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
-      for (const [eventIndex, event] of events.entries()) {
+      for (const event of events) {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (this.getEventHash(sourceEvent.name) === event.keys[0]) {
@@ -247,7 +245,6 @@ export class StarknetProvider extends BaseProvider {
                 txId,
                 rawEvent: event,
                 event: parsedEvent,
-                eventIndex,
                 helpers
               });
 
@@ -267,12 +264,31 @@ export class StarknetProvider extends BaseProvider {
         ]);
 
         const nextSources = this.instance.getCurrentSources(blockNumber);
-        sourcesQueue = sourcesQueue.concat(nextSources.slice(lastSources.length));
+        const newSources = nextSources.slice(lastSources.length);
+
+        sourcesQueue = sourcesQueue.concat(newSources);
         lastSources = this.instance.getCurrentSources(blockNumber);
+
+        if (newSources.length > 0) {
+          this.handleNewSourceAdded();
+
+          this.log.info(
+            { newSources: newSources.map(s => s.contract) },
+            'new sources added, fetching missing events'
+          );
+
+          const newSourcesEvents = await this.getEventsForSources({
+            fromBlock: blockNumber,
+            toBlock: blockNumber,
+            sources: newSources
+          });
+
+          events = events.concat(newSourcesEvents);
+        }
       }
     }
 
-    this.log.debug({ txIndex }, 'handling transaction done');
+    this.log.debug({ txId }, 'handling transaction done');
   }
 
   private async getBlockWithReceipts(blockId: SPEC.BLOCK_ID) {
@@ -377,10 +393,18 @@ export class StarknetProvider extends BaseProvider {
     return events;
   }
 
-  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+  async getEventsForSources({
+    fromBlock,
+    toBlock,
+    sources
+  }: {
+    fromBlock: number;
+    toBlock: number;
+    sources: ContractSourceConfig[];
+  }): Promise<Event[]> {
     let events: Event[] = [];
 
-    for (const source of this.instance.getCurrentSources(fromBlock)) {
+    for (const source of sources) {
       const addressEvents = await this.getEventsRangeForAddress(
         fromBlock,
         toBlock,
@@ -389,6 +413,16 @@ export class StarknetProvider extends BaseProvider {
       );
       events = events.concat(addressEvents);
     }
+
+    return events;
+  }
+
+  async getCheckpointsRange(fromBlock: number, toBlock: number): Promise<CheckpointRecord[]> {
+    const events = await this.getEventsForSources({
+      fromBlock,
+      toBlock,
+      sources: this.instance.getCurrentSources(fromBlock)
+    });
 
     for (const log of events) {
       if (!this.logsCache.has(log.block_number)) {
