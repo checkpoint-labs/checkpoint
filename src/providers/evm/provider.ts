@@ -5,11 +5,9 @@ import { Interface, LogDescription } from '@ethersproject/abi';
 import { keccak256 } from '@ethersproject/keccak256';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, Writer } from './types';
+import { Block, Writer, EventsData } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
-
-type EventsMap = Record<string, Log[]>;
 
 type GetLogsBlockHashFilter = {
   blockHash: string;
@@ -70,7 +68,7 @@ export class EvmProvider extends BaseProvider {
 
   async processBlock(blockNum: number, parentHash: string | null) {
     let block: Block | null = null;
-    let eventsMap: EventsMap;
+    let eventsData: EventsData;
 
     const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
     const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
@@ -90,7 +88,7 @@ export class EvmProvider extends BaseProvider {
     }
 
     try {
-      eventsMap = await this.getEvents({
+      eventsData = await this.getEvents({
         blockNumber: blockNum,
         blockHash: block?.hash ?? null
       });
@@ -109,7 +107,7 @@ export class EvmProvider extends BaseProvider {
       throw new ReorgDetectedError();
     }
 
-    await this.handleBlock(blockNum, block, eventsMap);
+    await this.handleBlock(blockNum, block, eventsData);
 
     if (block) {
       await this.instance.setBlockHash(blockNum, block.hash);
@@ -120,19 +118,31 @@ export class EvmProvider extends BaseProvider {
     return blockNum + 1;
   }
 
-  private async handleBlock(blockNumber: number, block: Block | null, eventsMap: EventsMap) {
+  private async handleBlock(blockNumber: number, block: Block | null, eventsData: EventsData) {
     this.log.info({ blockNumber }, 'handling block');
 
-    const blockTransactions = Object.keys(eventsMap);
+    const blockTransactions = Object.keys(eventsData.events);
 
     for (const txId of blockTransactions) {
-      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
+      await this.handleTx(
+        block,
+        blockNumber,
+        txId,
+        eventsData.isPreloaded,
+        eventsData.events[txId] || []
+      );
     }
 
     this.log.debug({ blockNumber }, 'handling block done');
   }
 
-  private async handleTx(block: Block | null, blockNumber: number, txId: string, logs: Log[]) {
+  private async handleTx(
+    block: Block | null,
+    blockNumber: number,
+    txId: string,
+    isPreloaded: boolean,
+    logs: Log[]
+  ) {
     this.log.debug({ txId }, 'handling transaction');
 
     const helpers = await this.instance.getWriterHelpers();
@@ -230,7 +240,7 @@ export class EvmProvider extends BaseProvider {
         sourcesQueue = sourcesQueue.concat(newSources);
         lastSources = this.instance.getCurrentSources(blockNumber);
 
-        if (newSources.length) {
+        if (isPreloaded && newSources.length) {
           this.handleNewSourceAdded();
 
           this.log.info(
@@ -258,9 +268,12 @@ export class EvmProvider extends BaseProvider {
   }: {
     blockHash: string | null;
     blockNumber: number;
-  }): Promise<EventsMap> {
+  }): Promise<EventsData> {
+    let isPreloaded = false;
     let events: Log[] = [];
+
     if (this.logsCache.has(blockNumber)) {
+      isPreloaded = true;
       events = this.logsCache.get(blockNumber) || [];
       this.logsCache.delete(blockNumber);
     } else {
@@ -273,13 +286,16 @@ export class EvmProvider extends BaseProvider {
       });
     }
 
-    return events.reduce((acc, event) => {
-      if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
+    return {
+      isPreloaded,
+      events: events.reduce((acc, event) => {
+        if (!acc[event.transactionHash]) acc[event.transactionHash] = [];
 
-      acc[event.transactionHash] = acc[event.transactionHash].concat(event);
+        acc[event.transactionHash] = acc[event.transactionHash].concat(event);
 
-      return acc;
-    }, {});
+        return acc;
+      }, {})
+    };
   }
 
   /**
