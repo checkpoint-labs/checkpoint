@@ -9,7 +9,16 @@ export type Event = RPC.GetEventsResponse['events'][number];
 // (Partially) narrowed types as real types are not exported from `starknet`.
 export type FullBlock = Block & { block_number: number; block_hash: string };
 
-export type EventsMap = { [key: string]: Event[] };
+export type EventsData = {
+  /**
+   * Whether the events were preloaded from the cache.
+   * If true, it means that events were fetched only for known sources and it might not contain all events from the block.
+   * In that case additional logs fetching will be performed for new sources.
+   */
+  isPreloaded: boolean;
+  events: Record<string, Event[]>;
+};
+
 export type ParsedEvent = Record<string, any>;
 
 export type Writer = (

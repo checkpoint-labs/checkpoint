@@ -3,7 +3,7 @@ import { BlockWithTxReceipts, SPEC } from '@starknet-io/types-js';
 import { BaseProvider, BlockNotFoundError, ReorgDetectedError } from '../base';
 import { parseEvent } from './utils';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, FullBlock, Event, EventsMap, ParsedEvent, isFullBlock, Writer } from './types';
+import { Block, FullBlock, Event, EventsData, ParsedEvent, isFullBlock, Writer } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
 
@@ -57,7 +57,7 @@ export class StarknetProvider extends BaseProvider {
 
   async processBlock(blockNum: number, parentHash: string | null) {
     let block: Block | null = null;
-    let blockEvents: EventsMap;
+    let eventsData: EventsData;
     try {
       const skipBlockFetching = this.instance.opts?.skipBlockFetching ?? false;
       const hasPreloadedBlockEvents = skipBlockFetching && this.logsCache.has(blockNum);
@@ -71,7 +71,7 @@ export class StarknetProvider extends BaseProvider {
         throw new Error('invalid block');
       }
 
-      blockEvents = await this.getEvents({
+      eventsData = await this.getEvents({
         blockNumber: blockNum,
         blockHash: block?.block_hash ?? null
       });
@@ -90,7 +90,7 @@ export class StarknetProvider extends BaseProvider {
       throw new ReorgDetectedError();
     }
 
-    await this.handleBlock(blockNum, block, blockEvents);
+    await this.handleBlock(blockNum, block, eventsData);
 
     if (block && isFullBlock(block)) {
       await this.instance.setBlockHash(blockNum, block.block_hash);
@@ -108,24 +108,34 @@ export class StarknetProvider extends BaseProvider {
       .filter(receipt => !this.seenPoolTransactions.has(receipt.transaction_hash));
 
     const txIds = receipts.map(receipt => receipt.transaction_hash);
-    const eventsMap = receipts.reduce((acc, receipt) => {
-      if (receipt === null) return acc;
 
-      acc[receipt.transaction_hash] = receipt.events;
-      return acc;
-    }, {});
+    const eventsData = {
+      isPreloaded: false,
+      events: receipts.reduce((acc, receipt) => {
+        if (receipt === null) return acc;
 
-    await this.handlePool(txIds, eventsMap, blockNumber);
+        acc[receipt.transaction_hash] = receipt.events;
+        return acc;
+      }, {})
+    };
+
+    await this.handlePool(txIds, eventsData, blockNumber);
   }
 
-  private async handleBlock(blockNumber: number, block: FullBlock | null, eventsMap: EventsMap) {
+  private async handleBlock(blockNumber: number, block: FullBlock | null, eventsData: EventsData) {
     this.log.info({ blockNumber }, 'handling block');
 
-    const blockTransactions = Object.keys(eventsMap);
+    const blockTransactions = Object.keys(eventsData.events);
     const txsToCheck = blockTransactions.filter(txId => !this.seenPoolTransactions.has(txId));
 
     for (const txId of txsToCheck) {
-      await this.handleTx(block, blockNumber, txId, eventsMap[txId] || []);
+      await this.handleTx(
+        block,
+        blockNumber,
+        txId,
+        eventsData.isPreloaded,
+        eventsData.events[txId] || []
+      );
     }
 
     this.seenPoolTransactions.clear();
@@ -133,11 +143,17 @@ export class StarknetProvider extends BaseProvider {
     this.log.debug({ blockNumber }, 'handling block done');
   }
 
-  private async handlePool(txIds: string[], eventsMap: EventsMap, blockNumber: number) {
+  private async handlePool(txIds: string[], eventsData: EventsData, blockNumber: number) {
     this.log.info('handling pool');
 
     for (const txId of txIds) {
-      await this.handleTx(null, blockNumber, txId, eventsMap[txId] || []);
+      await this.handleTx(
+        null,
+        blockNumber,
+        txId,
+        eventsData.isPreloaded,
+        eventsData.events[txId] || []
+      );
 
       this.seenPoolTransactions.add(txId);
     }
@@ -149,6 +165,7 @@ export class StarknetProvider extends BaseProvider {
     block: FullBlock | null,
     blockNumber: number,
     txId: string,
+    isPreloaded: boolean,
     events: Event[]
   ) {
     this.log.debug({ txId }, 'handling transaction');
@@ -263,7 +280,7 @@ export class StarknetProvider extends BaseProvider {
         sourcesQueue = sourcesQueue.concat(newSources);
         lastSources = this.instance.getCurrentSources(blockNumber);
 
-        if (newSources.length > 0) {
+        if (isPreloaded && newSources.length > 0) {
           this.handleNewSourceAdded();
 
           this.log.info(
@@ -318,10 +335,12 @@ export class StarknetProvider extends BaseProvider {
   }: {
     blockHash: string | null;
     blockNumber: number;
-  }): Promise<EventsMap> {
+  }): Promise<EventsData> {
+    let isPreloaded = false;
     let events: Event[] = [];
 
     if (this.logsCache.has(blockNumber)) {
+      isPreloaded = true;
       events = this.logsCache.get(blockNumber) || [];
       this.logsCache.delete(blockNumber);
     } else {
@@ -344,13 +363,16 @@ export class StarknetProvider extends BaseProvider {
       } while (continuationToken);
     }
 
-    return events.reduce((acc, event) => {
-      if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
+    return {
+      isPreloaded,
+      events: events.reduce((acc, event) => {
+        if (!acc[event.transaction_hash]) acc[event.transaction_hash] = [];
 
-      acc[event.transaction_hash].push(event);
+        acc[event.transaction_hash].push(event);
 
-      return acc;
-    }, {});
+        return acc;
+      }, {})
+    };
   }
 
   async getEventsRangeForAddress(
