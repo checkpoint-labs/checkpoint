@@ -5,9 +5,10 @@ import { Interface, LogDescription } from '@ethersproject/abi';
 import { keccak256 } from '@ethersproject/keccak256';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { CheckpointRecord } from '../../stores/checkpoints';
-import { Block, Writer, EventsData } from './types';
+import { Block, Writer, EventsData, CustomJsonRpcError } from './types';
 import { ContractSourceConfig } from '../../types';
 import { sleep } from '../../utils/helpers';
+import { getRangeHint } from './helpers';
 
 type GetLogsBlockHashFilter = {
   blockHash: string;
@@ -19,12 +20,6 @@ type GetLogsBlockRangeFilter = {
 };
 
 const MAX_BLOCKS_PER_REQUEST = 10000;
-
-class CustomJsonRpcError extends Error {
-  constructor(message: string, public code: number, public data: any) {
-    super(message);
-  }
-}
 
 export class EvmProvider extends BaseProvider {
   private readonly provider: Provider;
@@ -389,18 +384,20 @@ export class EvmProvider extends BaseProvider {
         if (currentTo === toBlock) break;
         currentFrom = currentTo + 1;
         currentTo = Math.min(toBlock, currentFrom + MAX_BLOCKS_PER_REQUEST);
-      } catch (e: unknown) {
-        // Handle Infura response size hint
-        if (e instanceof CustomJsonRpcError) {
-          if (e.code === -32005) {
-            currentFrom = parseInt(e.data.from, 16);
-            currentTo = Math.min(parseInt(e.data.to, 16), currentFrom + MAX_BLOCKS_PER_REQUEST);
-            continue;
-          }
+      } catch (err: unknown) {
+        const rangeHint = getRangeHint(err, {
+          from: currentFrom,
+          to: currentTo
+        });
+
+        if (rangeHint) {
+          currentFrom = rangeHint.from;
+          currentTo = rangeHint.to;
+          continue;
         }
 
         this.log.error(
-          { fromBlock: currentFrom, toBlock: currentTo, address, err: e },
+          { fromBlock: currentFrom, toBlock: currentTo, address, err },
           'getLogs failed'
         );
 

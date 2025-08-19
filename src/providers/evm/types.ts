@@ -2,6 +2,12 @@ import { Provider, Log } from '@ethersproject/providers';
 import { LogDescription } from '@ethersproject/abi';
 import { BaseWriterParams } from '../../types';
 
+export class CustomJsonRpcError extends Error {
+  constructor(message: string, public code: number, public data: any) {
+    super(message);
+  }
+}
+
 export type EventsData = {
   /**
    * Whether the events were preloaded from the cache.
