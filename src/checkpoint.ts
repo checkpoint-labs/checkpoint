@@ -40,7 +40,8 @@ export default class Checkpoint {
               target: 'pino-pretty'
             }
           }
-        : {})
+        : {}),
+      ...opts?.pinoOptions
     });
 
     const dbConnection = opts?.dbConnection || process.env.DATABASE_URL;
