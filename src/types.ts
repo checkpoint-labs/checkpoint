@@ -1,3 +1,4 @@
+import pino from 'pino';
 import { z } from 'zod';
 import { LogLevel } from './utils/logger';
 import {
@@ -24,6 +25,11 @@ export interface CheckpointOptions {
   logLevel?: LogLevel;
   /** Format logs to pretty output. Not recommended for production. */
   prettifyLogs?: boolean;
+  /**
+   * Custom pino options helpful when using custom transports.
+   * Those options will be merged with Checkpoint's pino options.
+   */
+  pinoOptions?: pino.LoggerOptions;
   /**
    * Optional database connection string. Must be PostgreSQL connection string.
    * If not provided connection strinng will be read from DATABASE_URL environment variable.
